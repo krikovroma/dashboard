@@ -713,6 +713,7 @@ body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
     <div id="sl-main" class="dash-col">
     <!-- Деньги -->
     <div class="kpi-row" id="slMoneyRow"></div>
+    <div id="slSalaryWrap"></div>
     <!-- Воронка (этапы) -->
     <div class="kpi-row" id="slKpiRow"></div>
 
@@ -2094,6 +2095,174 @@ function onSalesPlan(idx,el){ try{ if(el.value==='') localStorage.removeItem(_sl
 // последние 4 непустых этапа — с планом (как в найме)
 function _salesPlanStages(){ const d=curSalesData; if(!d) return []; const nn=d.month.map((v,i)=>v==null?-1:i).filter(i=>i>=0); return nn.slice(-4); }
 
+// ===== ЗАРПЛАТА МЕНЕДЖЕРА (накопительно на сегодня) =====
+// Мотивация с 01.07.2026: фикс 30К (условие — 2-недельный план звонков),
+// KPI 30К (1-й месяц — план по КП, со 2-го — по встречам), 5% от маржи (40% от оплат) — всегда.
+function _slStartKey(){ return 'slstart_'+slMgr; }
+function _slTwKey(){ return 'sltw_'+slMgr; }
+function getSlStart(){ try{ return localStorage.getItem(_slStartKey())||''; }catch(e){ return ''; } }
+function getSlTw(){ try{ return localStorage.getItem(_slTwKey())||''; }catch(e){ return ''; } }
+function onSlStart(el){ try{ localStorage.setItem(_slStartKey(),el.value); }catch(e){} renderSalesSalary(curSalesData); }
+function onSlTw(el){ try{ localStorage.setItem(_slTwKey(),el.value); }catch(e){} renderSalesSalary(curSalesData); }
+function _dayNum(ds){ return parseInt(ds.split('.')[0],10); } // "01.07" -> 1
+function _fmtD(dt){ return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0'); }
+
+function renderSalesSalary(d){
+  const wrap=document.getElementById('slSalaryWrap'); if(!wrap) return;
+  if(!d || slMgr==='all'){ wrap.innerHTML=''; return; }
+  const FIX=30000, KPIB=30000, MARG=0.4, PCT=0.05;
+  const txt=isDark?'#8b949e':'#57606a', strong=isDark?'#e6edf3':'#24292f';
+  const [mName,yStr]=slSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
+  const lastDay=new Date(year,mm,0).getDate();
+  const totalWD=_workDays(year,mm,1,lastDay);
+  const dayRate=FIX/totalWD;
+  const now=new Date(); const mEnd=new Date(year,mm-1,lastDay,23,59,59), mStart=new Date(year,mm-1,1);
+  const monthClosed = now>mEnd;
+  const todayD = monthClosed?lastDay:(now<mStart?0:now.getDate());
+  // Отработанные дни: в строке дня есть хоть один ненулевой показатель
+  const workedDays=(d.days||[]).filter(x=>x.s&&x.s.some(v=>v>0)&&_dayNum(x.d)<=Math.max(todayD,lastDay*(monthClosed?1:0)));
+  const worked=workedDays.length;
+  const startStr=getSlStart(), twPlan=parseFloat(getSlTw())||0;
+  const startDt=startStr?new Date(startStr+'T00:00:00'):null;
+
+  // --- Инпуты (дата выхода, план звонков на 2 недели) ---
+  const inputs=`<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <span style="font-size:11px;color:${txt}">вышла на работу</span>
+    <input type="date" class="ginp" style="width:130px" value="${_esc(startStr)}" onchange="onSlStart(this)">
+    <span style="font-size:11px;color:${txt}">план звонков / 2 нед.</span>
+    <input type="number" min="0" class="ginp" style="width:80px" value="${twPlan||''}" oninput="onSlTw(this)">
+  </span>`;
+
+  if(!startDt || !(twPlan>0)){
+    wrap.innerHTML=`<div class="chart-card">
+      <div class="chart-head" style="margin-bottom:6px"><div>
+        <div class="chart-title">💰 Зарплата — ${mgrName(slMgr)}</div>
+        <div class="chart-sub">${slSelMonth} · накопительным итогом на сегодня</div>
+      </div>${inputs}</div>
+      <div style="font-size:12px;color:${txt}">Укажите дату выхода на работу и двухнедельный план по звонкам — и здесь появится расчёт зарплаты.</div>
+    </div>`;
+    return;
+  }
+
+  // --- Номер месяца работы (для KPI: 1-й — план по КП, со 2-го — встречи) ---
+  const mIdx=(year-startDt.getFullYear())*12+(mm-1-startDt.getMonth())+1; // 1 = первый месяц
+  const kpiIdx = mIdx<=1 ? 1 : 4; // 1=КП, 4=Проведено встреч
+  const kpiName = mIdx<=1 ? 'КП' : 'проведённым встречам';
+  const kpiPlan=parseFloat(getSalesPlan(kpiIdx))||0;
+  const kpiFact=d.month[kpiIdx]||0;
+  const pace=_paceInfo(slSelMonth);
+  const kpiProj=pace.elapsed>0?Math.round(kpiFact*pace.mult):0;
+  const kpiOnTrack=kpiPlan>0?kpiProj>=kpiPlan:false;
+  const kpiDone=kpiPlan>0&&kpiFact>=kpiPlan;
+
+  // --- Двухнедельные периоды от даты выхода, пересекающие выбранный месяц ---
+  const periods=[];
+  let ps=new Date(startDt);
+  while(ps<=mEnd){
+    const pe=new Date(ps); pe.setDate(pe.getDate()+13);
+    if(pe>=mStart) periods.push({s:new Date(ps), e:new Date(pe)});
+    ps=new Date(pe); ps.setDate(ps.getDate()+1);
+  }
+  let fixEarned=0, fixProj=0; const pRows=[];
+  periods.forEach((p,pi)=>{
+    // звонки за период (по данным выбранного месяца)
+    const calls=(d.days||[]).reduce((sum,x)=>{
+      const dd=new Date(year,mm-1,_dayNum(x.d));
+      return sum+(dd>=p.s&&dd<=p.e?(x.s[0]||0):0);
+    },0);
+    // отработанные дни периода в этом месяце
+    const wIn=workedDays.filter(x=>{const dd=new Date(year,mm-1,_dayNum(x.d));return dd>=p.s&&dd<=p.e;}).length;
+    const closed=now>p.e;
+    const ok=calls>=twPlan;
+    let st,sum=0,proj=0;
+    if(closed){
+      st=ok?'выполнен ✓':'не выполнен ✗';
+      if(ok){ sum=Math.round(dayRate*wIn); }
+    } else {
+      // темп внутри периода
+      const wdAll=_workDays(p.s.getFullYear(),p.s.getMonth()+1,p.s.getDate(),Math.min(p.e.getDate(),new Date(p.s.getFullYear(),p.s.getMonth()+1,0).getDate())); // приблизительно, для подсказки
+      st=ok?'уже выполнен ✓':'в процессе…';
+      const wdRest=_workDays(year,mm,Math.max(todayD+1,1),Math.min(lastDay,p.e.getDate()));
+      proj=Math.round(dayRate*(wIn+(ok?wdRest:0)));
+      if(ok) sum=Math.round(dayRate*wIn);
+    }
+    fixEarned+=sum; fixProj+=closed?sum:Math.max(sum,proj);
+    pRows.push(`<tr><td style="padding:3px 8px">${_fmtD(p.s)}–${_fmtD(p.e)}</td><td style="padding:3px 8px;text-align:right">${calls} / ${twPlan}</td><td style="padding:3px 8px;text-align:right">${wIn}</td><td style="padding:3px 8px">${st}</td><td style="padding:3px 8px;text-align:right">${sum?fmt(sum)+' р.':(closed?'0 р.':'—')}</td></tr>`);
+  });
+
+  // --- KPI ---
+  let kpiEarned=0, kpiProjSum=0, kpiSt;
+  const kpiFull=Math.round(KPIB*worked/totalWD);
+  if(monthClosed){
+    kpiEarned = kpiDone ? kpiFull : 0;
+    kpiProjSum=kpiEarned;
+    kpiSt = kpiDone?`план выполнен ✓ (${kpiFact} из ${kpiPlan})`:`план не выполнен ✗ (${kpiFact} из ${kpiPlan})`;
+  } else {
+    kpiEarned = 0; // платится в конце месяца
+    kpiProjSum = kpiOnTrack ? KPIB : 0;
+    kpiSt = kpiPlan>0
+      ? (kpiOnTrack?`идём на ${kpiProj} из ${kpiPlan} — к выполнению ✓`:`идём на ${kpiProj} из ${kpiPlan} — темп мал ⚠`)
+      : 'план не задан';
+  }
+
+  // --- 5% от маржи ---
+  const opl=(d.money&&d.money.oplaty)||0;
+  const margin=Math.round(opl*MARG);
+  const bonus=Math.round(margin*PCT);
+  const oplProj=pace.elapsed>0?Math.round(opl*pace.mult):opl;
+  const bonusProj=Math.round(oplProj*MARG*PCT);
+
+  const earned=fixEarned+kpiEarned+bonus;
+  const proj=fixProj+kpiProjSum+bonusProj;
+
+  const badge=(ok,warn)=>`<span class="kpi-exec ${ok?'exec-good':warn?'exec-ok':'exec-bad'}" style="font-size:10.5px">`;
+  wrap.innerHTML=`<div class="chart-card">
+    <div class="chart-head" style="margin-bottom:10px;flex-wrap:wrap;gap:8px"><div>
+      <div class="chart-title">💰 Зарплата — ${mgrName(slMgr)}</div>
+      <div class="chart-sub">${slSelMonth} · накопительным итогом на ${monthClosed?'конец месяца':'сегодня'} · отработано ${worked} из ${totalWD} раб. дней</div>
+    </div>${inputs}</div>
+    <div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+      <div><div style="font-size:11px;color:${txt};text-transform:uppercase;letter-spacing:.4px">Заработано на ${monthClosed?'конец месяца':'сегодня'}</div>
+        <div style="font-size:30px;font-weight:800;color:#1a7f37;line-height:1.1">${fmt(earned)} р.</div></div>
+      <div><div style="font-size:11px;color:${txt};text-transform:uppercase;letter-spacing:.4px">Прогноз за месяц</div>
+        <div style="font-size:22px;font-weight:700;color:${strong};line-height:1.1">${fmt(proj)} р.</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:10px">
+      <div style="border:1px solid ${isDark?'#30363d':'#d0d7de'};border-radius:8px;padding:9px 12px">
+        <div style="font-size:11px;color:${txt}">Фикс (30 000 р. / мес)</div>
+        <div style="font-size:17px;font-weight:700;color:${strong}">${fmt(fixEarned)} р.</div>
+        <div style="font-size:10.5px;color:${txt}">условие: план звонков за 2 недели</div>
+      </div>
+      <div style="border:1px solid ${isDark?'#30363d':'#d0d7de'};border-radius:8px;padding:9px 12px">
+        <div style="font-size:11px;color:${txt}">KPI (30 000 р., в конце месяца)</div>
+        <div style="font-size:17px;font-weight:700;color:${strong}">${fmt(kpiEarned)} р.</div>
+        <div style="font-size:10.5px;color:${txt}">${mIdx<=1?'1-й месяц: план по КП':'план по встречам'} · ${kpiSt}</div>
+      </div>
+      <div style="border:1px solid ${isDark?'#30363d':'#d0d7de'};border-radius:8px;padding:9px 12px">
+        <div style="font-size:11px;color:${txt}">5% с продаж (от маржи, всегда)</div>
+        <div style="font-size:17px;font-weight:700;color:#1a7f37">${fmt(bonus)} р.</div>
+        <div style="font-size:10.5px;color:${txt}">оплаты ${fmt(opl)} × 40% × 5%</div>
+      </div>
+    </div>
+    <details style="font-size:12px;color:${strong}">
+      <summary style="cursor:pointer;color:#0969da;font-weight:600;font-size:12px">Как посчитано — подробный расчёт</summary>
+      <div style="padding:10px 2px 2px;line-height:1.55">
+        <b>Исходные:</b> вышла на работу ${_fmtD(startDt)}.${startDt.getFullYear()} · рабочих дней в месяце ${totalWD} · отработано ${worked} (день считается отработанным, если есть хоть один показатель) · фикс за 1 раб. день = 30 000 / ${totalWD} = ${fmt(Math.round(dayRate))} р.<br><br>
+        <b>1) Фикс — по двухнедельным периодам</b> (отсчёт от даты выхода; звонки — по данным этого месяца):<br>
+        <table style="border-collapse:collapse;margin:4px 0;font-size:11.5px">
+          <tr style="color:${txt}"><td style="padding:3px 8px">период</td><td style="padding:3px 8px">звонки/план</td><td style="padding:3px 8px">отраб. дн.</td><td style="padding:3px 8px">статус</td><td style="padding:3px 8px">начислено</td></tr>
+          ${pRows.join('')}
+        </table>
+        Правило: план 2-недельки выполнен → фикс за отработанные дни периода; не выполнен → 0 за период.<br><br>
+        <b>2) KPI 30 000 р.</b> — ${mIdx<=1?'первый месяц работы, план по КП':'месяц работы №'+mIdx+', план по проведённым встречам'}: факт ${kpiFact} из ${kpiPlan||'—'} (${kpiSt}). Платится в конце месяца${monthClosed?'':' — в «заработано» пока 0, в прогнозе '+fmt(kpiProjSum)+' р.'}. При выполнении: 30 000 × ${worked}/${totalWD} отраб. дней = ${fmt(kpiFull)} р.<br><br>
+        <b>3) Премия 5%</b>: оплаты ${fmt(opl)} р. → маржа 40% = ${fmt(margin)} р. → 5% = <b>${fmt(bonus)} р.</b> Прогноз: при текущем темпе оплаты ${fmt(oplProj)} р. → премия ${fmt(bonusProj)} р.<br><br>
+        <b>Итого на ${monthClosed?'конец месяца':'сегодня'}</b>: ${fmt(fixEarned)} (фикс) + ${fmt(kpiEarned)} (KPI) + ${fmt(bonus)} (5%) = <b>${fmt(earned)} р.</b><br>
+        <span style="color:${txt}">Дата выхода и план звонков хранятся в браузере этого устройства.</span>
+      </div>
+    </details>
+  </div>`;
+}
+
 function renderSalesDash(d){
   curSalesData=d;
   const stages=SALES_STAGES, n=stages.length, col=STAGE_PAL[n]||STAGE_PAL[6];
@@ -2158,6 +2327,8 @@ function renderSalesDash(d){
   document.getElementById('slFunnelSvg').innerHTML = buildFunnelSvg(stages,col,month,cv,nn);
   setSalesFunnelView(slFunnelView);
 
+  // Зарплата менеджера
+  renderSalesSalary(d);
   // Активность по дням
   if(!nn.includes(slDayStage)) slDayStage=nn[0];
   renderSalesDayChart();
