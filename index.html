@@ -282,10 +282,8 @@ body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;line-height:1.1">
-      <span class="badge" id="liveBadge">● Live</span>
-      <span id="actualLabel" style="font-size:11px;color:#57606a;white-space:nowrap"></span>
-    </div>
+    <span id="actualLabel" style="font-size:11px;color:#57606a;white-space:nowrap"></span>
+    <span class="badge" id="liveBadge">● Live</span>
     <button id="themeToggle" onclick="toggleTheme()" title="Переключить тему" style="background:none;border:1px solid #d0d7de;border-radius:6px;padding:5px 10px;font-size:16px;cursor:pointer;line-height:1;color:inherit;">🌙</button>
   </div>
 </div>
@@ -1732,6 +1730,17 @@ function getPlan(idx){ try{ const v=localStorage.getItem(_planKey(idx)); return 
 function onKpiPlan(idx, el){ try{ if(el.value==='') localStorage.removeItem(_planKey(idx)); else localStorage.setItem(_planKey(idx), el.value); }catch(e){} renderGaugeGrid(); renderGoing(); }
 // ===== ДАШБОРД «Идём на» (прогноз по темпу: факт × всего_дней / прошло_дней) =====
 function _workDays(year, mm, fromD, toD){ let c=0; for(let d=fromD; d<=toD; d++){ const dow=new Date(year,mm-1,d).getDay(); if(dow>=1&&dow<=5) c++; } return c; }
+// Темп движения к цели за месяц: прошло/всего раб. дней и множитель прогноза
+function _paceInfo(selMonth){
+  const [mName,yStr]=selMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
+  const lastDay=new Date(year,mm,0).getDate();
+  const total=_workDays(year,mm,1,lastDay);
+  const now=new Date(), mStart=new Date(year,mm-1,1), mEnd=new Date(year,mm-1,lastDay,23,59,59);
+  let cutoff;
+  if(now>mEnd) cutoff=lastDay; else if(now<mStart) cutoff=0; else cutoff=now.getDate();
+  const elapsed=cutoff>0?_workDays(year,mm,1,cutoff):0;
+  return {elapsed,total,mult:elapsed>0?total/elapsed:0};
+}
 function renderGoing(){
   const wrap=document.getElementById('goingWrap'); if(!wrap) return;
   const d=curVacData; if(!d){ wrap.innerHTML=''; return; }
@@ -1779,13 +1788,17 @@ function renderGaugeGrid(){
   const grid=document.getElementById('gaugeGrid'); if(!grid) return;
   const d=curVacData; if(!d){ grid.innerHTML=''; return; }
   const stages=VAC_META[hrVac].stages, txt=isDark?'#8b949e':'#57606a';
+  const pace=_paceInfo(mopSelMonth);
   grid.innerHTML = _planStages().map(idx=>{
-    const fact=d.month[idx]||0, plan=parseFloat(getPlan(idx)), hasPlan=plan>0, pct=hasPlan?Math.round(fact/plan*100):0;
-    return `<div class="chart-card" style="padding:10px 10px;display:flex;flex-direction:column;min-width:0">
+    const fact=d.month[idx]||0, plan=parseFloat(getPlan(idx)), hasPlan=plan>0;
+    const proj=pace.elapsed>0?Math.round(fact*pace.mult):0;
+    const pct=hasPlan?Math.round(proj/plan*100):0;
+    const tip=hasPlan?`Скорость к цели: за ${pace.elapsed} из ${pace.total} раб. дней — факт ${fact}. С таким темпом к концу месяца будет ${proj} из ${plan} (${pct}%).`:'План не задан';
+    return `<div class="chart-card" style="padding:10px 10px;display:flex;flex-direction:column;min-width:0" title="${tip}">
       <div class="chart-title" style="font-size:11.5px;line-height:1.15">${stages[idx]}</div>
       <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
         ${buildMiniGaugeSvg(pct,hasPlan)}
-        <div style="text-align:center;font-size:11px;color:${isDark?'#e6edf3':'#24292f'};margin-top:2px">факт ${fact} · план ${hasPlan?plan:'—'}</div>
+        <div style="text-align:center;font-size:11px;color:${isDark?'#e6edf3':'#24292f'};margin-top:2px">факт ${fact} · план ${hasPlan?plan:'—'} · идём на ${hasPlan?proj:'—'}</div>
       </div>
     </div>`;
   }).join('');
@@ -1810,6 +1823,8 @@ function _shade(hex,amt){
 }
 function _esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function buildFunnelSvg(stages,col,month,cv,nn){
+  // уникальный префикс id — иначе градиенты двух воронок (найм/продажи) конфликтуют
+  const uid='fx'+(buildFunnelSvg._n=(buildFunnelSvg._n||0)+1)+'_';
   const vals=nn.map(i=>month[i]), names=nn.map(i=>stages[i]), cols=nn.map(i=>col[i]), cvs=nn.map(i=>cv[i]);
   const N=vals.length;
   const W=360, maxW=322, minW=78, cx=W/2, segH=46, gap=26, padT=8, padB=8;
@@ -1825,9 +1840,9 @@ function buildFunnelSvg(stages,col,month,cv,nn){
     const wBot=k<N-1 ? wOf(vals[k+1]) : Math.max(minW*0.66, wTop*0.6);
     const yb=y+segH;
     const x1=cx-wTop/2, x2=cx+wTop/2, x3=cx+wBot/2, x4=cx-wBot/2;
-    const c=cols[k], gid='fg'+k;
+    const c=cols[k], gid=uid+'g'+k;
     defs+=`<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${_shade(c,34)}"/><stop offset="1" stop-color="${_shade(c,-26)}"/></linearGradient>`;
-    shapes+=`<polygon points="${x1},${y} ${x2},${y} ${x3},${yb} ${x4},${yb}" fill="url(#${gid})" stroke="${_shade(c,-40)}" stroke-width="1" filter="url(#fsh)"/>`;
+    shapes+=`<polygon points="${x1},${y} ${x2},${y} ${x3},${yb} ${x4},${yb}" fill="url(#${gid})" stroke="${_shade(c,-40)}" stroke-width="1" filter="url(#${uid}sh)"/>`;
     shapes+=`<polygon points="${x1},${y} ${x2},${y} ${x2-4},${y+3.5} ${x1+4},${y+3.5}" fill="rgba(255,255,255,.4)"/>`;
     labels+=`<text x="${cx}" y="${y+18}" text-anchor="middle" font-size="9.5" font-weight="600" fill="rgba(255,255,255,.95)" font-family="'Segoe UI',sans-serif">${_esc(names[k].length>20?names[k].slice(0,19)+'…':names[k])}</text>`;
     labels+=`<text x="${cx}" y="${y+37}" text-anchor="middle" font-size="18" font-weight="800" fill="#fff" font-family="'Segoe UI',sans-serif" style="paint-order:stroke;stroke:rgba(0,0,0,.22);stroke-width:2.5px">${vals[k]}</text>`;
@@ -1839,7 +1854,7 @@ function buildFunnelSvg(stages,col,month,cv,nn){
     }
     y=yb+gap;
   }
-  const filt=`<filter id="fsh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2.4" flood-color="rgba(0,0,0,.20)"/></filter>`;
+  const filt=`<filter id="${uid}sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2.4" flood-color="rgba(0,0,0,.20)"/></filter>`;
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;max-width:440px;max-height:440px;margin:0 auto" xmlns="http://www.w3.org/2000/svg"><defs>${filt}${defs}</defs>${shapes}${conv}${labels}</svg>`;
 }
 
@@ -2167,13 +2182,17 @@ function setSalesFunnelView(v){
 function renderSalesGaugeGrid(){
   const grid=document.getElementById('slGaugeGrid'); if(!grid) return;
   const d=curSalesData; if(!d){ grid.innerHTML=''; return; }
+  const pace=_paceInfo(slSelMonth);
   grid.innerHTML = _salesPlanStages().map(idx=>{
-    const fact=d.month[idx]||0, plan=parseFloat(getSalesPlan(idx)), hasPlan=plan>0, pct=hasPlan?Math.round(fact/plan*100):0;
-    return `<div class="chart-card" style="padding:10px 10px;display:flex;flex-direction:column;min-width:0">
+    const fact=d.month[idx]||0, plan=parseFloat(getSalesPlan(idx)), hasPlan=plan>0;
+    const proj=pace.elapsed>0?Math.round(fact*pace.mult):0;
+    const pct=hasPlan?Math.round(proj/plan*100):0;
+    const tip=hasPlan?`Скорость к цели: за ${pace.elapsed} из ${pace.total} раб. дней — факт ${fact}. С таким темпом к концу месяца будет ${proj} из ${plan} (${pct}%).`:'План не задан';
+    return `<div class="chart-card" style="padding:10px 10px;display:flex;flex-direction:column;min-width:0" title="${tip}">
       <div class="chart-title" style="font-size:11.5px;line-height:1.15">${SALES_STAGES[idx]}</div>
       <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
         ${buildMiniGaugeSvg(pct,hasPlan)}
-        <div style="text-align:center;font-size:11px;color:${isDark?'#e6edf3':'#24292f'};margin-top:2px">факт ${fact} · план ${hasPlan?plan:'—'}</div>
+        <div style="text-align:center;font-size:11px;color:${isDark?'#e6edf3':'#24292f'};margin-top:2px">факт ${fact} · план ${hasPlan?plan:'—'} · идём на ${hasPlan?proj:'—'}</div>
       </div>
     </div>`;
   }).join('');
@@ -2494,26 +2513,42 @@ function initSortable(){
 }
 
 // ===== INIT =====
-window.addEventListener('load', async ()=>{
-  // одноразовая очистка ранее сохранённых планов спидометра
-  try{ if(!localStorage.getItem('_gplanResetV3')){ Object.keys(localStorage).filter(k=>k.indexOf('gplan_')===0).forEach(k=>localStorage.removeItem(k)); localStorage.setItem('_gplanResetV3','1'); } }catch(e){}
-  // Fetch live data from Google Sheets (fallback: hardcoded data above)
+// Загрузка живых данных; rerender=true — перерисовать текущий вид после обновления
+let _lastLiveOk = 0;
+async function loadLive(rerender){
   try {
     const live = await fetchLiveData();
     if (live.length >= 3) {
       months = live;
       allWeeks = months.flatMap((m,mi) => (m.weeks||[]).map(w=>({...w,mi})));
-      console.log('✅ Данные из Google Sheets загружены:', live.length, 'месяцев');
+      _lastLiveOk = Date.now();
+      const b=document.getElementById('liveBadge');
+      if(b){ b.textContent='● Live'; b.title='Данные из Google-таблицы · автообновление каждые 5 минут и при возврате на вкладку'; }
+      if(rerender) renderCurrentView();
+      updateActualLabel();
+      return true;
     }
   } catch(e) {
     console.warn('⚠️ Google Sheets недоступен, используются кешированные данные:', e.message);
     const b=document.getElementById('liveBadge');
     if(b){ b.textContent='○ Кеш'; b.title='Google-таблица недоступна — показаны сохранённые данные'; }
   }
+  return false;
+}
+
+window.addEventListener('load', async ()=>{
+  // одноразовая очистка ранее сохранённых планов спидометра
+  try{ if(!localStorage.getItem('_gplanResetV3')){ Object.keys(localStorage).filter(k=>k.indexOf('gplan_')===0).forEach(k=>localStorage.removeItem(k)); localStorage.setItem('_gplanResetV3','1'); } }catch(e){}
+  await loadLive(false);
   initSortable();
   restoreNav();
   updateActualLabel();
   setInterval(updateActualLabel, 60000);
+  // автообновление данных: каждые 5 минут + при возврате на вкладку
+  setInterval(()=>loadLive(true), 5*60*1000);
+  document.addEventListener('visibilitychange', ()=>{
+    if(!document.hidden && Date.now()-_lastLiveOk>60000) loadLive(true);
+  });
 });
 </script>
 </body>
