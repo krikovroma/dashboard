@@ -1,0 +1,2520 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Бизнес-дашборд</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+:root { color-scheme: light; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:#f6f8fa; color:#24292f; min-height:100vh; }
+
+/* HEADER */
+.header { background:#ffffff; border-bottom:1px solid #d0d7de; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+.header-left { display:flex; align-items:center; gap:12px; }
+.logo { width:34px;height:34px;background:linear-gradient(135deg,#0969da,#8250df);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px; }
+.h-title { font-size:17px;font-weight:600;color:#24292f; }
+.h-sub { font-size:11px;color:#57606a;margin-top:1px; }
+.badge { background:#0969da;color:#fff;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500; }
+
+/* DEPT TABS */
+.dept-tabs { background:#ffffff; border-bottom:2px solid #d0d7de; padding:0 24px; display:flex; gap:2px; }
+.dept-tab { padding:13px 22px;font-size:13px;font-weight:600;color:#57606a;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:7px; }
+.dept-tab:hover { color:#24292f;background:#f6f8fa; }
+.dept-tab.active { color:#0969da;border-bottom-color:#0969da; }
+.dept-tab .icon { font-size:15px; }
+
+/* MONTH SUB-TABS */
+.month-tabs-wrap { background:#ffffff;border-bottom:1px solid #d0d7de;padding:0 24px;overflow-x:auto; }
+.month-tabs { display:flex;gap:2px;white-space:nowrap; }
+.month-tab { padding:9px 14px;font-size:12px;font-weight:500;color:#57606a;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s; }
+.month-tab:hover { color:#24292f; }
+.month-tab.active { color:#0969da;border-bottom-color:#0969da; }
+
+/* DEPT SECTIONS */
+.dept-section { display:none; }
+.dept-section.active { display:block; }
+
+/* BOARD (Главные цифры) */
+.board-head { font-size:16px;font-weight:700;color:#24292f;padding:8px 24px 4px;margin-top:16px;display:flex;align-items:center;gap:9px;border-top:1px solid #eaeef2; }
+.board-head:first-child { margin-top:4px;border-top:none; }
+.board-head .icon { font-size:18px; }
+body.dark .board-head { color:#f0f6fc;border-top-color:#21262d; }
+
+/* MAIN */
+.main { padding:18px 24px;display:flex;flex-direction:column;gap:14px; }
+.dash-col { display:flex;flex-direction:column;gap:14px; }
+
+/* KPI CARDS */
+.kpi-row { display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px; }
+.kpi-plan-inp { width:50px;font-size:11px;padding:3px 6px;border:1px solid #d0d7de;border-radius:5px;background:#fff;color:#24292f;font-family:inherit; }
+body.dark .kpi-plan-inp { background:#0d1117;border-color:#30363d;color:#e6edf3; }
+.kpi-plan-wrap { margin-left:auto;display:flex;align-items:center;gap:5px; }
+.kpi-plan-lbl { font-size:11px;color:#57606a; }
+body.dark .kpi-plan-lbl { color:#8b949e; }
+/* Дашборд «Идём на» */
+.going-row { display:flex;align-items:center;gap:12px;padding:7px 0; }
+.going-lbl { width:160px;flex-shrink:0;font-size:12px;color:#24292f;text-align:right;line-height:1.2; }
+.going-bar { flex:1;height:22px;border:1.5px dashed #aeb6c0;border-radius:5px;position:relative;overflow:hidden;background:transparent; }
+.going-fill { height:100%;border-radius:3px 0 0 3px; }
+.going-num { width:96px;flex-shrink:0;font-size:12px;font-variant-numeric:tabular-nums; }
+body.dark .going-lbl { color:#e6edf3; }
+body.dark .going-bar { border-color:#484f58; }
+.kpi-card { background:#ffffff;border:1px solid #d0d7de;border-radius:10px;padding:16px 18px;position:relative;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.kpi-card::before { content:'';position:absolute;top:0;left:0;right:0;height:3px; }
+.kpi-card.blue::before { background:linear-gradient(90deg,#0969da,#388bfd); }
+.kpi-card.green::before { background:linear-gradient(90deg,#1a7f37,#2ea043); }
+.kpi-card.purple::before { background:linear-gradient(90deg,#8250df,#a371f7); }
+.kpi-card.orange::before { background:linear-gradient(90deg,#9a6700,#d29922); }
+.kpi-card.teal::before { background:linear-gradient(90deg,#1a7f37,#39d353); }
+.kpi-label { font-size:10px;color:#57606a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px; }
+.kpi-value { font-size:24px;font-weight:700;color:#24292f;line-height:1; }
+.kpi-unit { font-size:13px;color:#57606a;font-weight:400;margin-left:3px; }
+.kpi-footer { display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap; }
+.kpi-plan { font-size:11px;color:#57606a; }
+.kpi-exec { font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px; }
+.exec-good { background:rgba(26,127,55,.12);color:#1a7f37; }
+.exec-ok { background:rgba(154,103,0,.12);color:#9a6700; }
+.exec-bad { background:rgba(207,34,46,.12);color:#cf222e; }
+.kpi-arrow { font-size:12px;margin-left:auto; }
+.arrow-up { color:#1a7f37; }
+.arrow-dn { color:#cf222e; }
+
+/* CHART CARDS */
+.charts-row { display:grid;gap:14px; }
+.cols-2 { grid-template-columns:1fr 1fr; }
+.cols-3 { grid-template-columns:1.4fr 1fr 1fr; }
+.gsel,.ginp { font-size:12px;padding:5px 8px;border:1px solid #d0d7de;border-radius:6px;background:#fff;color:#24292f;font-family:inherit; }
+.ginp { width:88px; }
+body.dark .gsel,body.dark .ginp { background:#0d1117;border-color:#30363d;color:#e6edf3; }
+.cols-31 { grid-template-columns:2fr 1fr; }
+.cols-13 { grid-template-columns:1fr 2fr; }
+.chart-card { background:#ffffff;border:1px solid #d0d7de;border-radius:10px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.05); }
+.chart-head { display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px; }
+.chart-title { font-size:13px;font-weight:600;color:#24292f; }
+.chart-sub { font-size:11px;color:#57606a;margin-top:2px; }
+.legend { display:flex;gap:10px;flex-wrap:wrap; }
+.leg-item { display:flex;align-items:center;gap:4px;font-size:11px;color:#57606a; }
+.leg-dot { width:8px;height:8px;border-radius:50%; }
+.ch { position:relative; }
+.h180 { height:180px; }
+.h220 { height:220px; }
+.h250 { height:250px; }
+.h280 { height:280px; }
+
+/* NO DATA */
+.no-data { display:flex;flex-direction:column;align-items:center;justify-content:center;height:120px;color:#57606a;font-size:12px;gap:6px; }
+.no-data-icon { font-size:28px;opacity:.4; }
+
+/* FUNNEL */
+.funnel-list { display:flex;flex-direction:column;gap:7px; }
+.f-item { display:flex;align-items:center;gap:8px; }
+.f-label { font-size:11px;color:#57606a;width:140px;flex-shrink:0;text-align:right; }
+.f-bar-bg { flex:1;background:#eaeef2;border-radius:4px;height:26px;position:relative; }
+.f-bar { height:100%;border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:600;color:#fff;min-width:40px;transition:width .8s ease; }
+.f-cv { font-size:10px;width:44px;text-align:left;flex-shrink:0; }
+
+/* HR FUNNEL */
+.hr-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:4px; }
+.hr-role-card { background:#f6f8fa;border:1px solid #d0d7de;border-radius:8px;padding:14px; }
+.hr-role-title { font-size:12px;font-weight:600;color:#24292f;margin-bottom:10px;display:flex;align-items:center;gap:6px; }
+.hr-stat { display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #d0d7de; }
+.hr-stat:last-child { border-bottom:none; }
+.hr-stat-label { font-size:11px;color:#57606a; }
+.hr-stat-val { font-size:12px;font-weight:600;color:#24292f; }
+
+/* FIN TABLE */
+.fin-table { width:100%;border-collapse:collapse;font-size:12px; }
+.fin-table th { color:#57606a;font-weight:500;padding:7px 10px;text-align:left;border-bottom:1px solid #d0d7de;font-size:11px;text-transform:uppercase;letter-spacing:.4px; }
+.fin-table td { padding:7px 10px;border-bottom:1px solid #f6f8fa;color:#24292f; }
+.fin-table tr:last-child td { border-bottom:none; }
+.fin-table tr:hover td { background:#f6f8fa; }
+.tag { display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600; }
+.tag-g { background:rgba(26,127,55,.12);color:#1a7f37; }
+.tag-y { background:rgba(154,103,0,.12);color:#9a6700; }
+.tag-r { background:rgba(207,34,46,.12);color:#cf222e; }
+
+/* SCALING TABLE */
+.scale-table { width:100%;border-collapse:collapse;font-size:12px; }
+.scale-table th { background:#f6f8fa;color:#57606a;font-size:11px;font-weight:600;padding:8px 12px;text-align:center;border:1px solid #d0d7de; }
+.scale-table td { padding:7px 12px;text-align:center;border:1px solid #d0d7de;color:#24292f; }
+.scale-table .row-label { text-align:left;color:#57606a;background:#f6f8fa; }
+.scale-table tr:hover td { background:#f6f8fa; }
+
+/* CHART TOGGLE */
+.chart-toggle { display:flex;background:#f6f8fa;border:1px solid #d0d7de;border-radius:6px;overflow:hidden; }
+.tog-btn { padding:4px 11px;font-size:11px;font-weight:500;color:#57606a;background:transparent;border:none;cursor:pointer;transition:all .15s;white-space:nowrap; }
+.tog-btn:hover { color:#24292f;background:#eaeef2; }
+.tog-btn.active { background:#0969da;color:#fff; }
+
+/* RANGE BAR */
+.range-bar { display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap; }
+.range-label { font-size:11px;color:#57606a;white-space:nowrap; }
+.range-hint { font-size:11px;color:#0969da;margin-left:4px;white-space:nowrap; }
+
+/* VACANCY TABS (внутри HR-найма) */
+.vac-tabs { display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 4px; }
+.vac-btn { padding:6px 14px;font-size:12px;font-weight:600;color:#57606a;background:#fff;border:1px solid #d0d7de;border-radius:20px;cursor:pointer;transition:all .15s; }
+.vac-btn:hover { color:#24292f;border-color:#0969da; }
+.vac-btn.active { background:#0969da;color:#fff;border-color:#0969da; }
+/* Drag & drop перестановка вкладок */
+.dept-tab,#kopyDeptTabs .month-tab,.vac-btn { cursor:grab; }
+.dept-tab:active,#kopyDeptTabs .month-tab:active,.vac-btn:active { cursor:grabbing; }
+.dragging { opacity:.4; }
+.mf-wrap { overflow-x:auto;border-bottom:1px solid #d0d7de;margin-bottom:10px; }
+.mf-wrap .month-tabs { gap:2px; }
+.stage-tabs { display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px; }
+.stage-btn { padding:4px 10px;font-size:11px;font-weight:600;color:#57606a;background:#f6f8fa;border:1px solid #d0d7de;border-radius:14px;cursor:pointer;transition:all .15s;white-space:nowrap; }
+.stage-btn:hover { color:#24292f;border-color:#0969da; }
+
+/* VAC TABLE (детализация за месяц) */
+.vt-wrap { overflow:auto;max-height:460px;border:1px solid #d0d7de;border-radius:8px; }
+.vt { width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;font-size:12px; }
+.vt th,.vt td { padding:6px 4px; }
+.vt thead th { position:sticky;top:0;background:#f0f3f6;color:#57606a;font-size:10px;font-weight:700;line-height:1.15;text-align:center;white-space:normal;word-break:break-word;vertical-align:middle;border-bottom:2px solid #d0d7de;z-index:2; }
+.vt thead th:first-child { text-align:center;left:0;z-index:3; }
+.vt tr.wsp td { height:11px;padding:0;border:none;background:transparent; }
+.vt tr.wsp td:first-child { position:static;background:transparent; }
+.vt td { text-align:center;white-space:nowrap;border-bottom:1px solid #f0f2f5;color:#24292f;font-variant-numeric:tabular-nums; }
+.vt td:first-child { text-align:left;color:#57606a;font-weight:500;position:sticky;left:0;background:#fff; }
+.vt tr.cvw td { background:#f5faf6;color:#2a8f45;font-weight:600;font-size:11px; }
+.vt tr.cvw td:first-child { background:#f5faf6;color:#2a8f45; }
+.vt tbody tr:hover td { background:#f6f8fa; }
+.vt tbody tr:hover td:first-child { background:#f6f8fa; }
+.vt .z { color:#c2c9d1; }
+.vt .dow { color:#8b98a5;font-weight:400;font-size:10px;margin-right:5px;display:inline-block;width:16px; }
+body.dark .vt .dow { color:#6e7681; }
+.vt tr.wk td { background:#eef4ff;font-weight:700;border-top:1px solid #d0d7de;border-bottom:1px solid #d0d7de; }
+.vt tr.wk td:first-child { background:#eef4ff;color:#0969da; }
+.vt tr.mo td { background:#dbe9ff;font-weight:800;border-top:2px solid #0969da; }
+.vt tr.mo td:first-child { background:#dbe9ff;color:#0b4b8f; }
+.vt tr.cv td { background:#f0faf3;color:#1a7f37;font-weight:700; }
+.vt tr.cv td:first-child { background:#f0faf3;color:#1a7f37; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width:4px;height:4px; }
+::-webkit-scrollbar-thumb { background:#d0d7de;border-radius:2px; }
+
+/* ===== DARK THEME ===== */
+body.dark { background:#0d1117; color:#e6edf3; }
+body.dark .header { background:#161b22; border-bottom-color:#30363d; box-shadow:none; }
+body.dark .h-title { color:#f0f6fc; }
+body.dark .h-sub { color:#8b949e; }
+body.dark #themeToggle { border-color:#30363d; }
+body.dark .dept-tabs { background:#0d1117; border-bottom-color:#21262d; }
+body.dark .dept-tab { color:#8b949e; }
+body.dark .dept-tab:hover { color:#c9d1d9; background:transparent; }
+body.dark .dept-tab.active { color:#58a6ff; border-bottom-color:#58a6ff; }
+body.dark .month-tabs-wrap { background:#161b22; border-bottom-color:#21262d; }
+body.dark .month-tab { color:#8b949e; }
+body.dark .month-tab:hover { color:#e6edf3; }
+body.dark .month-tab.active { color:#58a6ff; border-bottom-color:#58a6ff; }
+body.dark .kpi-card { background:#161b22; border-color:#21262d; box-shadow:none; }
+body.dark .kpi-label { color:#8b949e; }
+body.dark .kpi-value { color:#f0f6fc; }
+body.dark .kpi-unit { color:#8b949e; }
+body.dark .kpi-plan { color:#8b949e; }
+body.dark .exec-good { background:rgba(63,185,80,.15); color:#3fb950; }
+body.dark .exec-ok { background:rgba(210,153,34,.15); color:#e3b341; }
+body.dark .exec-bad { background:rgba(248,81,73,.15); color:#f85149; }
+body.dark .arrow-up { color:#3fb950; }
+body.dark .arrow-dn { color:#f85149; }
+body.dark .chart-card { background:#161b22; border-color:#21262d; box-shadow:none; }
+body.dark .chart-title { color:#f0f6fc; }
+body.dark .chart-sub { color:#8b949e; }
+body.dark .leg-item { color:#8b949e; }
+body.dark .no-data { color:#8b949e; }
+body.dark .f-label { color:#8b949e; }
+body.dark .f-bar-bg { background:#21262d; }
+body.dark .hr-role-card { background:#0d1117; border-color:#21262d; }
+body.dark .hr-role-title { color:#f0f6fc; }
+body.dark .hr-stat { border-bottom-color:#21262d; }
+body.dark .hr-stat-label { color:#8b949e; }
+body.dark .hr-stat-val { color:#f0f6fc; }
+body.dark .fin-table th { color:#8b949e; border-bottom-color:#21262d; }
+body.dark .fin-table td { border-bottom-color:#0d1117; color:#e6edf3; }
+body.dark .fin-table tr:hover td { background:rgba(255,255,255,.02); }
+body.dark .scale-table th { background:#1c2333; color:#8b949e; border-color:#21262d; }
+body.dark .scale-table td { border-color:#21262d; color:#c9d1d9; }
+body.dark .scale-table .row-label { background:#161b22; color:#8b949e; }
+body.dark .scale-table tr:hover td { background:rgba(255,255,255,.02); }
+body.dark .vac-btn { background:#161b22; border-color:#30363d; color:#8b949e; }
+body.dark .vac-btn:hover { color:#e6edf3; border-color:#58a6ff; }
+body.dark .vac-btn.active { background:#1f6feb; color:#fff; border-color:#1f6feb; }
+body.dark .mf-wrap { border-bottom-color:#21262d; }
+body.dark .stage-btn { background:#0d1117; border-color:#30363d; color:#8b949e; }
+body.dark .stage-btn:hover { color:#e6edf3; border-color:#58a6ff; }
+body.dark .vt-wrap { border-color:#30363d; }
+body.dark .vt thead th { background:#1c2333; color:#8b949e; border-bottom-color:#30363d; }
+body.dark .vt td { color:#e6edf3; border-bottom-color:#21262d; }
+body.dark .vt td:first-child { color:#8b949e; background:#161b22; }
+body.dark .vt tbody tr:hover td, body.dark .vt tbody tr:hover td:first-child { background:rgba(255,255,255,.03); }
+body.dark .vt .z { color:#484f58; }
+body.dark .vt tr.wk td, body.dark .vt tr.wk td:first-child { background:#182338; color:#58a6ff; border-color:#30363d; }
+body.dark .vt tr.mo td, body.dark .vt tr.mo td:first-child { background:#1c2f4a; color:#79c0ff; border-top-color:#1f6feb; }
+body.dark .vt tr.cv td, body.dark .vt tr.cv td:first-child { background:#122019; color:#3fb950; }
+body.dark .vt tr.cvw td, body.dark .vt tr.cvw td:first-child { background:#0f1a13; color:#2ea043; }
+.mf-dot { display:inline-block;width:5px;height:5px;border-radius:50%;background:#1a7f37;margin-left:5px;vertical-align:middle; }
+body.dark .mf-dot { background:#3fb950; }
+body.dark .chart-toggle { background:#0d1117; border-color:#30363d; }
+body.dark .tog-btn { color:#8b949e; }
+body.dark .tog-btn:hover { color:#c9d1d9; background:transparent; }
+body.dark .tog-btn.active { background:#1f6feb; color:#fff; }
+body.dark .range-label { color:#8b949e; }
+body.dark .range-hint { color:#58a6ff; }
+body.dark .tag-g { background:rgba(63,185,80,.15); color:#3fb950; }
+body.dark .tag-y { background:rgba(210,153,34,.15); color:#e3b341; }
+body.dark .tag-r { background:rgba(248,81,73,.15); color:#f85149; }
+body.dark .badge { background:#1f6feb; }
+body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">📊</div>
+    <div>
+      <div class="h-title">Бизнес-дашборд</div>
+      <div class="h-sub">Складской бизнес · Июль 2025 – Апрель 2026</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;line-height:1.1">
+      <span class="badge" id="liveBadge">● Live</span>
+      <span id="actualLabel" style="font-size:11px;color:#57606a;white-space:nowrap"></span>
+    </div>
+    <button id="themeToggle" onclick="toggleTheme()" title="Переключить тему" style="background:none;border:1px solid #d0d7de;border-radius:6px;padding:5px 10px;font-size:16px;cursor:pointer;line-height:1;color:inherit;">🌙</button>
+  </div>
+</div>
+
+<!-- DEPT TABS -->
+<div class="dept-tabs" id="deptTabs">
+  <div class="dept-tab active" data-dept="glavnye" onclick="switchDept('glavnye')"><span class="icon">📊</span>Главные цифры</div>
+  <div class="dept-tab" data-dept="kopy" onclick="switchDept('kopy')"><span class="icon">🎯</span>КОПы</div>
+</div>
+
+<!-- ====== ГЛАВНЫЕ ЦИФРЫ (доска дашбордов) ====== -->
+<div class="dept-section active" id="dept-glavnye">
+
+<!-- ---- Склад ---- -->
+<div class="board-head"><span class="icon">📦</span>Склад</div>
+<div id="dept-sklad">
+  <div class="main" id="skladMain">
+    <!-- KPI -->
+    <div class="kpi-row">
+      <div class="kpi-card blue">
+        <div class="kpi-label">Выручка (факт)</div>
+        <div class="kpi-value" id="kv-rev">–</div>
+        <div class="kpi-footer">
+          <span class="kpi-plan" id="kv-rev-plan">–</span>
+          <span class="kpi-exec" id="kv-rev-exec">–</span>
+          <span class="kpi-arrow" id="kv-rev-arr"></span>
+        </div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Маржа (факт)</div>
+        <div class="kpi-value" id="kv-mar">–</div>
+        <div class="kpi-footer">
+          <span class="kpi-plan" id="kv-mar-plan">–</span>
+          <span class="kpi-exec" id="kv-mar-exec">–</span>
+        </div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">Рентабельность</div>
+        <div class="kpi-value" id="kv-ren">–<span class="kpi-unit">%</span></div>
+        <div class="kpi-footer">
+          <span class="kpi-plan" id="kv-ren-plan">–</span>
+          <span class="kpi-exec" id="kv-ren-exec">–</span>
+        </div>
+      </div>
+      <div class="kpi-card orange">
+        <div class="kpi-label">Упаковано единиц</div>
+        <div class="kpi-value" id="kv-uni">–</div>
+        <div class="kpi-footer">
+          <span class="kpi-plan" id="kv-uni-plan">–</span>
+          <span class="kpi-exec" id="kv-uni-exec">–</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: All-months overview + Weekly breakdown -->
+    <div class="charts-row cols-2">
+      <div class="chart-card">
+        <div class="chart-head" style="margin-bottom:10px">
+          <div><div class="chart-title">Выручка по месяцам (выработка)</div><div class="chart-sub" id="allMonthsSub">Все месяцы · план vs факт</div></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="legend" id="allMonthsLegend">
+              <div class="leg-item"><div class="leg-dot" style="background:#58a6ff"></div>План</div>
+              <div class="leg-item"><div class="leg-dot" style="background:#3fb950"></div>Факт</div>
+            </div>
+            <div class="chart-toggle" id="allMonthsToggle">
+              <button class="tog-btn active" onclick="setMonthChartMode('fact')" id="tog-fact">Только факт</button>
+              <button class="tog-btn" onclick="setMonthChartMode('both')" id="tog-both">План / Факт</button>
+              <button class="tog-btn" onclick="setMonthChartMode('table')" id="tog-table">Таблица + Линии</button>
+            </div>
+          </div>
+        </div>
+        <div class="range-bar">
+          <span class="range-label">Период:</span>
+          <div class="chart-toggle">
+            <button class="tog-btn active" onclick="setMonthRange('all')"  id="rng-all">Все</button>
+            <button class="tog-btn"        onclick="setMonthRange('2025')" id="rng-2025">2025</button>
+            <button class="tog-btn"        onclick="setMonthRange('2026')" id="rng-2026">2026</button>
+            <button class="tog-btn"        onclick="setMonthRange('6m')"   id="rng-6m">6 мес.</button>
+            <button class="tog-btn"        onclick="setMonthRange('3m')"   id="rng-3m">3 мес.</button>
+          </div>
+          <span class="range-hint" id="rangeHint">Июл 2025 — Апр 2026</span>
+        </div>
+        <div class="ch h220" id="allMonthsBarWrap"><canvas id="allMonthsChart"></canvas></div>
+        <div id="allMonthsTableView" style="display:none;flex-direction:row;gap:14px;min-height:220px;align-items:stretch">
+          <div id="allMonthsTableEl" style="overflow-y:auto;flex-shrink:0;"></div>
+          <div style="flex:1;position:relative;min-height:220px;"><canvas id="allMonthsLineCanvas"></canvas></div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title" id="weekChartTitle">Выручка по неделям</div><div class="chart-sub">Выбранный месяц · план vs факт</div></div>
+          <div class="legend">
+            <div class="leg-item"><div class="leg-dot" style="background:#58a6ff"></div>План</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#3fb950"></div>Факт</div>
+          </div>
+        </div>
+        <div class="ch h220" id="weekChartWrap"><canvas id="weeklyChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Row 3: Daily revenue + Renta daily -->
+    <div class="charts-row cols-2">
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Выручка по дням</div><div class="chart-sub">Факт vs план</div></div>
+          <div class="legend">
+            <div class="leg-item"><div class="leg-dot" style="background:#8b949e;opacity:.5"></div>План</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#58a6ff"></div>Факт</div>
+          </div>
+        </div>
+        <div class="ch h220" id="dailyChartWrap"><canvas id="dailyChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Рентабельность по дням</div><div class="chart-sub">% факт</div></div>
+        </div>
+        <div class="ch h220" id="rentaChartWrap"><canvas id="rentaChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Row 4: Execution % + Units -->
+    <div class="charts-row cols-2">
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">% выполнения плана по неделям</div><div class="chart-sub">Выбранный месяц</div></div>
+        </div>
+        <div class="ch h180" id="execChartWrap"><canvas id="execChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Единицы по месяцам</div><div class="chart-sub">Упаковано · план vs факт</div></div>
+          <div class="legend">
+            <div class="leg-item"><div class="leg-dot" style="background:#bc8cff"></div>План</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#e3b341"></div>Факт</div>
+          </div>
+        </div>
+        <div class="ch h180"><canvas id="unitsChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ТЕСТ -->
+    <div class="charts-row cols-1" style="margin-top:4px">
+      <div class="chart-card" style="border:2px dashed #e3b341">
+        <div class="chart-head">
+          <div>
+            <div class="chart-title" style="color:#e3b341">🧪 ТЕСТ</div>
+            <div class="chart-sub">Выручка факт по месяцам · проверочный блок</div>
+          </div>
+        </div>
+        <div class="ch h200"><canvas id="testChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ---- Отдел продаж ---- -->
+<div class="board-head"><span class="icon">📈</span>Отдел продаж</div>
+<div id="dept-prodazhi">
+  <div class="main">
+    <div class="kpi-row">
+      <div class="kpi-card blue">
+        <div class="kpi-label">Холодные звонки</div>
+        <div class="kpi-value">1 370</div>
+        <div class="kpi-footer"><span class="kpi-plan">КП: 86</span><span class="kpi-exec exec-ok">CV 6.3%</span></div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Лиды входящие</div>
+        <div class="kpi-value">21</div>
+        <div class="kpi-footer"><span class="kpi-plan">КП: 19</span><span class="kpi-exec exec-good">CV 90.5%</span></div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">Встречи проведено</div>
+        <div class="kpi-value">17</div>
+        <div class="kpi-footer"><span class="kpi-plan">назначено: 26</span><span class="kpi-exec exec-ok">65%</span></div>
+      </div>
+      <div class="kpi-card teal">
+        <div class="kpi-label">Новые клиенты</div>
+        <div class="kpi-value">3</div>
+        <div class="kpi-footer"><span class="kpi-plan">договоров: 7</span><span class="kpi-exec exec-ok">43%</span></div>
+      </div>
+    </div>
+
+    <div class="charts-row cols-31">
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Воронка продаж</div><div class="chart-sub">Октябрь 2025 · накопительно</div></div>
+        </div>
+        <div class="funnel-list" id="salesFunnelWrap" style="padding-top:6px"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Конверсия по этапам</div><div class="chart-sub">CV% воронки</div></div></div>
+        <div class="ch h280"><canvas id="cvChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-row cols-2">
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Активность холодных звонков</div><div class="chart-sub">По неделям октября</div></div>
+          <div class="legend">
+            <div class="leg-item"><div class="leg-dot" style="background:#58a6ff"></div>Звонки</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#3fb950"></div>КП</div>
+          </div>
+        </div>
+        <div class="ch h220"><canvas id="callsChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Дожимы и встречи</div><div class="chart-sub">По неделям октября</div></div></div>
+        <div class="ch h220"><canvas id="meetingsChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /dept-glavnye -->
+
+<!-- ====== HR (пока не на доске, скрыто) ====== -->
+<div class="dept-section" id="dept-hr">
+  <div class="main">
+    <div class="kpi-row">
+      <div class="kpi-card blue">
+        <div class="kpi-label">Отправлено резюме</div>
+        <div class="kpi-value">207 <span class="kpi-unit">склад</span></div>
+        <div class="kpi-footer"><span class="kpi-plan">Дошло: 63</span><span class="kpi-exec exec-ok">30%</span></div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Стажировка</div>
+        <div class="kpi-value">28</div>
+        <div class="kpi-footer"><span class="kpi-plan">Прошли адапт.: 6</span><span class="kpi-exec exec-ok">21%</span></div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">МОПы — дозвоны</div>
+        <div class="kpi-value">299</div>
+        <div class="kpi-footer"><span class="kpi-plan">Офферы: 11</span><span class="kpi-exec exec-ok">Вышли: 0</span></div>
+      </div>
+      <div class="kpi-card orange">
+        <div class="kpi-label">РОПы — дозвоны</div>
+        <div class="kpi-value">155</div>
+        <div class="kpi-footer"><span class="kpi-plan">Офферы: 1</span><span class="kpi-exec exec-ok">Вышли: 0</span></div>
+      </div>
+    </div>
+
+    <div class="charts-row cols-2">
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Воронка найма</div><div class="chart-sub">Склад · Октябрь 2025</div></div></div>
+        <div class="funnel-list" id="hrFunnelWrap" style="padding-top:6px"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Найм по ролям</div><div class="chart-sub">Дозвоны vs Офферы</div></div></div>
+        <div class="ch h250"><canvas id="hrRolesChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-head"><div><div class="chart-title">Точки масштабирования — персонал</div><div class="chart-sub">Стратегический план 2023 – 2028</div></div></div>
+      <div style="overflow-x:auto;margin-top:4px">
+        <table class="scale-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">Показатель</th>
+              <th>2023</th><th>2024</th><th>2025</th><th>2026</th><th>2027</th><th>2028</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="row-label">Выручка / год</td><td>2 млн</td><td>4 млн</td><td>72 млн</td><td>100 млн</td><td>200 млн</td><td>80 млн</td></tr>
+            <tr><td class="row-label">Чистая прибыль (20%)</td><td>400к</td><td>800к</td><td>14 млн</td><td>4 млн</td><td>8 млн</td><td>16 млн</td></tr>
+            <tr><td class="row-label">Сотрудники склада</td><td>–</td><td>11</td><td>20</td><td>40</td><td>80</td><td>160</td></tr>
+            <tr><td class="row-label">Бригадиры</td><td>–</td><td>1</td><td>5</td><td>10</td><td>20</td><td>40</td></tr>
+            <tr><td class="row-label">Менеджеры по продажам</td><td>–</td><td>0</td><td>6</td><td>20</td><td>40</td><td>–</td></tr>
+            <tr><td class="row-label">РОПы</td><td>–</td><td>1</td><td>2</td><td>5</td><td>10</td><td>–</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== ФИНАНСЫ ====== -->
+<div class="dept-section" id="dept-fin">
+  <div class="main">
+    <div class="kpi-row">
+      <div class="kpi-card blue">
+        <div class="kpi-label">Выручка всего (Июл–Апр)</div>
+        <div class="kpi-value">37.6 <span class="kpi-unit">млн</span></div>
+        <div class="kpi-footer"><span class="kpi-plan">план: 39.3 млн</span><span class="kpi-exec exec-ok">96%</span></div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Маржа всего</div>
+        <div class="kpi-value">23.8 <span class="kpi-unit">млн</span></div>
+        <div class="kpi-footer"><span class="kpi-plan">план: 26.1 млн</span><span class="kpi-exec exec-ok">91%</span></div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">Ср. рентабельность</div>
+        <div class="kpi-value">63 <span class="kpi-unit">%</span></div>
+        <div class="kpi-footer"><span class="kpi-plan">план: 65%</span><span class="kpi-exec exec-ok">–2%</span></div>
+      </div>
+      <div class="kpi-card orange">
+        <div class="kpi-label">Лучший месяц</div>
+        <div class="kpi-value">Дек '25</div>
+        <div class="kpi-footer"><span class="kpi-plan">выручка факт</span><span class="kpi-exec exec-good">5.26 млн</span></div>
+      </div>
+    </div>
+
+    <div class="charts-row cols-2">
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Выручка по месяцам (выработка)</div><div class="chart-sub">Июль 2025 – Апрель 2026 · план vs факт</div></div>
+          <div class="legend">
+            <div class="leg-item"><div class="leg-dot" style="background:#58a6ff"></div>План</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#3fb950"></div>Факт</div>
+          </div>
+        </div>
+        <div class="ch h250"><canvas id="finRevChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Рентабельность по месяцам</div><div class="chart-sub">% план vs факт</div></div></div>
+        <div class="ch h250"><canvas id="finRentaChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-row cols-2">
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">История выручки</div><div class="chart-sub">Март 2023 – Август 2024</div></div></div>
+        <div class="ch h220"><canvas id="histChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Ежемесячные показатели</div><div class="chart-sub">Июль 2025 – Апрель 2026</div></div></div>
+        <div style="overflow-x:auto">
+          <table class="fin-table">
+            <thead><tr><th>Месяц</th><th>Выручка (факт)</th><th>Маржа (факт)</th><th>Рент.</th><th>Выпол.</th></tr></thead>
+            <tbody id="finTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== КОПы ====== -->
+<div class="dept-section" id="dept-kopy">
+  <!-- Выбор отдела -->
+  <div class="month-tabs-wrap">
+    <div class="month-tabs" id="kopyDeptTabs">
+      <div class="month-tab" data-kdept="prodazhi" onclick="switchKopyDept('prodazhi')">📈 Отдел продаж</div>
+      <div class="month-tab active" data-kdept="hr" onclick="switchKopyDept('hr')">👥 HR — найм</div>
+      <div class="month-tab" data-kdept="sklad" style="opacity:.4;cursor:not-allowed" title="Скоро добавим">📦 Склад · скоро</div>
+    </div>
+  </div>
+
+  <!-- ===== HR · МОПы (удалённо) ===== -->
+  <div class="main kopy-view" id="kopy-hr">
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:2px">
+      <div class="chart-title" id="hrVacTitle" style="font-size:15px">Найм · МОПы (удалённо)</div>
+      <div class="chart-sub" id="hrVacSub">Июнь 2026 · воронка найма и активность рекрутеров</div>
+    </div>
+
+    <!-- Вакансии (переключение) -->
+    <div class="vac-tabs" id="hrVacTabs">
+      <button class="vac-btn active" data-vac="mopy" onclick="switchVac('mopy')">МОПы (удалённо)</button>
+      <button class="vac-btn" data-vac="ropy" onclick="switchVac('ropy')">РОПы</button>
+      <button class="vac-btn" data-vac="sklad" onclick="switchVac('sklad')">Склад</button>
+      <button class="vac-btn" data-vac="akkaunt" onclick="switchVac('akkaunt')">Аккаунт</button>
+    </div>
+
+    <!-- Фильтр по месяцам (точка = есть статистика) -->
+    <div class="mf-wrap"><div class="month-tabs" id="mopMonthTabs"></div></div>
+
+    <div id="vac-mopy" class="dash-col">
+    <div class="kpi-row" id="vacKpiRow"></div>
+
+    <div class="charts-row cols-3">
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Таблица по дням</div><div class="chart-sub" id="vacTableSub">детализация за месяц</div></div></div>
+        <div class="vt-wrap" id="vacTableWrap"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head" style="align-items:center">
+          <div><div class="chart-title" id="vacFunnelTitle">Воронка найма</div><div class="chart-sub" id="vacFunnelSub">накопительно за месяц</div></div>
+          <div class="chart-toggle">
+            <button class="tog-btn active" id="fv-funnel" onclick="setFunnelView('funnel')">Воронка</button>
+            <button class="tog-btn" id="fv-bars" onclick="setFunnelView('bars')">Полосы</button>
+          </div>
+        </div>
+        <div class="funnel-list" id="mopFunnelWrap" style="padding-top:6px"></div>
+        <div id="mopFunnelSvg" style="display:none;padding-top:2px"></div>
+      </div>
+      <div id="gaugeGrid" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:14px"></div>
+    </div>
+
+    <div class="charts-row cols-2">
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Идём на</div><div class="chart-sub" id="goingSub">прогноз на конец месяца по темпу · план — пунктир</div></div></div>
+        <div id="goingWrap" style="padding-top:4px"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Активность по дням</div><div class="chart-sub" id="vacDaySub">по дням месяца · выбранный этап</div></div>
+        </div>
+        <div class="stage-tabs" id="vacDayTabs"></div>
+        <div class="ch h220"><canvas id="mopDayChart"></canvas></div>
+      </div>
+    </div>
+    </div><!-- /vac-mopy -->
+
+    <div id="vac-empty" style="display:none">
+      <div class="chart-card" style="text-align:center;padding:48px 24px">
+        <div style="font-size:34px;opacity:.4;margin-bottom:10px">📭</div>
+        <div class="chart-title" id="vacEmptyTitle" style="font-size:15px;margin-bottom:6px">—</div>
+        <div class="chart-sub" id="vacEmptyMsg" style="max-width:560px;margin:0 auto;line-height:1.55">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Отдел продаж · КОПы ===== -->
+  <div class="main kopy-view" id="kopy-prodazhi" style="display:none">
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:2px">
+      <div class="chart-title" id="slTitle" style="font-size:15px">Отдел продаж · Сизова Ирина</div>
+      <div class="chart-sub" id="slSub">Июль 2026 · воронка продаж и активность менеджеров</div>
+    </div>
+
+    <!-- Менеджеры (переключение) -->
+    <div class="vac-tabs" id="slMgrTabs"></div>
+
+    <!-- Фильтр по месяцам (точка = есть статистика) -->
+    <div class="mf-wrap"><div class="month-tabs" id="slMonthTabs"></div></div>
+
+    <div id="sl-main" class="dash-col">
+    <!-- Деньги -->
+    <div class="kpi-row" id="slMoneyRow"></div>
+    <!-- Воронка (этапы) -->
+    <div class="kpi-row" id="slKpiRow"></div>
+
+    <div class="charts-row cols-3">
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Таблица по дням</div><div class="chart-sub" id="slTableSub">детализация за месяц</div></div></div>
+        <div class="vt-wrap" id="slTableWrap"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head" style="align-items:center">
+          <div><div class="chart-title" id="slFunnelTitle">Воронка продаж</div><div class="chart-sub" id="slFunnelSub">накопительно за месяц</div></div>
+          <div class="chart-toggle">
+            <button class="tog-btn active" id="slfv-funnel" onclick="setSalesFunnelView('funnel')">Воронка</button>
+            <button class="tog-btn" id="slfv-bars" onclick="setSalesFunnelView('bars')">Полосы</button>
+          </div>
+        </div>
+        <div class="funnel-list" id="slFunnelWrap" style="padding-top:6px"></div>
+        <div id="slFunnelSvg" style="display:none;padding-top:2px"></div>
+      </div>
+      <div id="slGaugeGrid" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:14px"></div>
+    </div>
+
+    <div class="charts-row cols-2">
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Идём на</div><div class="chart-sub" id="slGoingSub">прогноз на конец месяца по темпу · план — пунктир</div></div></div>
+        <div id="slGoingWrap" style="padding-top:4px"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Активность по дням</div><div class="chart-sub" id="slDaySub">по дням месяца · выбранный этап</div></div>
+        </div>
+        <div class="stage-tabs" id="slDayTabs"></div>
+        <div class="ch h220"><canvas id="slDayChart"></canvas></div>
+      </div>
+    </div>
+    </div><!-- /sl-main -->
+
+    <div id="sl-empty" style="display:none">
+      <div class="chart-card" style="text-align:center;padding:48px 24px">
+        <div style="font-size:34px;opacity:.4;margin-bottom:10px">📭</div>
+        <div class="chart-title" id="slEmptyTitle" style="font-size:15px;margin-bottom:6px">—</div>
+        <div class="chart-sub" id="slEmptyMsg" style="max-width:560px;margin:0 auto;line-height:1.55">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== DATA =====
+let months = [
+  { name:'Июл\'25', full:'Июль 2025',   revenueP:4650925, revenueF:3671956, marginP:3262490, marginF:2369166, unitsP:115470, unitsF:93379,  rentaP:70, rentaF:65,
+    weeks:[{n:'Нед.27',rP:1120950,rF:894902,ex:80},{n:'Нед.28',rP:1193460,rF:840312,ex:70},{n:'Нед.29',rP:1060720,rF:772882,ex:73},{n:'Нед.30',rP:1013930,rF:938780,ex:93}],
+    days:[{d:'01.07',rP:152290,rF:154080,rt:66},{d:'02.07',rP:140000,rF:62510,rt:30},{d:'03.07',rP:173500,rF:97846,rt:54},{d:'04.07',rP:183900,rF:139000,rt:63},{d:'05.07',rP:145660,rF:166116,rt:73},{d:'06.07',rP:175350,rF:137350,rt:68},{d:'07.07',rP:168750,rF:114000,rt:68},{d:'08.07',rP:174140,rF:149056,rt:69},{d:'09.07',rP:151600,rF:119600,rt:68},{d:'10.07',rP:181260,rF:69390,rt:45},{d:'11.07',rP:195980,rF:145456,rt:65},{d:'12.07',rP:150740,rF:100940,rt:52},{d:'13.07',rP:170990,rF:141870,rt:68},{d:'14.07',rP:132600,rF:98704,rt:52},{d:'15.07',rP:159720,rF:73200,rt:42},{d:'16.07',rP:159720,rF:113078,rt:63},{d:'17.07',rP:232600,rF:143500,rt:65},{d:'18.07',rP:157920,rF:136320,rt:74},{d:'19.07',rP:102960,rF:98640,rt:65},{d:'20.07',rP:115200,rF:109440,rt:69},{d:'21.07',rP:92160,rF:92160,rt:66},{d:'22.07',rP:128628,rF:131628,rt:72},{d:'23.07',rP:100140,rF:95100,rt:64},{d:'24.07',rP:182680,rF:182680,rt:68},{d:'25.07',rP:152000,rF:139760,rt:66},{d:'26.07',rP:144792,rF:136152,rt:64},{d:'27.07',rP:213530,rF:161300,rt:68},{d:'28.07',rP:164680,rF:147145,rt:68},{d:'29.07',rP:187435,rF:191935,rt:74},{d:'30.07',rP:60000,rF:24000,rt:12}]
+  },
+  { name:'Авг\'25', full:'Август 2025',  revenueP:3112197, revenueF:2638150, marginP:2069879, marginF:1633003, unitsP:82055,  unitsF:76573,  rentaP:67, rentaF:62,
+    weeks:[{n:'Нед.31',rP:698250,rF:609210,ex:87},{n:'Нед.32',rP:952935,rF:810270,ex:85},{n:'Нед.33',rP:749990,rF:606728,ex:81},{n:'Нед.34',rP:611549,rF:543030,ex:89},{n:'Нед.35',rP:511588,rF:431992,ex:84}],
+    days:[{d:'01.08',rP:104500,rF:104500,rt:49},{d:'02.08',rP:68830,rF:44350,rt:-17},{d:'03.08',rP:112805,rF:97280,rt:64},{d:'04.08',rP:143800,rF:139940,rt:68},{d:'05.08',rP:140225,rF:71260,rt:51},{d:'06.08',rP:175710,rF:130350,rt:66},{d:'07.08',rP:149040,rF:124560,rt:65},{d:'08.08',rP:115200,rF:126000,rt:73},{d:'09.08',rP:117360,rF:113760,rt:69},{d:'10.08',rP:111600,rF:104400,rt:70},{d:'11.08',rP:115200,rF:75600,rt:58},{d:'12.08',rP:129560,rF:106640,rt:62},{d:'13.08',rP:162180,rF:86568,rt:68},{d:'14.08',rP:87750,rF:96715,rt:63},{d:'15.08',rP:97625,rF:85525,rt:62},{d:'16.08',rP:99825,rF:99000,rt:58},{d:'17.08',rP:57850,rF:56680,rt:62},{d:'18.08',rP:108935,rF:109520,rt:67},{d:'19.08',rP:146000,rF:144056,rt:73},{d:'20.08',rP:80820,rF:63804,rt:60},{d:'21.08',rP:99510,rF:79328,rt:49},{d:'23.08',rP:114759,rF:100377,rt:70},{d:'24.08',rP:61525,rF:45945,rt:31},{d:'25.08',rP:97624,rF:95020,rt:67},{d:'26.08',rP:69178,rF:75900,rt:54},{d:'27.08',rP:103220,rF:73624,rt:60},{d:'28.08',rP:88206,rF:57176,rt:55},{d:'29.08',rP:153360,rF:130272,rt:70}]
+  },
+  { name:'Сен\'25', full:'Сентябрь 2025', revenueP:2444947, revenueF:2026717, marginP:1681410, marginF:1250747, unitsP:46851,  unitsF:39932,  rentaP:69, rentaF:62,
+    weeks:[{n:'Нед.36',rP:462566,rF:423782,ex:92},{n:'Нед.37',rP:917619,rF:780962,ex:85},{n:'Нед.38',rP:953192,rF:749873,ex:79},{n:'Нед.39',rP:40870,rF:46900,ex:115}],
+    days:[{d:'01.09',rP:21802,rF:10480,rt:-115},{d:'02.09',rP:41098,rF:38742,rt:39},{d:'03.09',rP:89775,rF:80053,rt:66},{d:'04.09',rP:173514,rF:174714,rt:77},{d:'05.09',rP:119817,rF:106833,rt:66},{d:'06.09',rP:16560,rF:12960,rt:-7},{d:'08.09',rP:105120,rF:106704,rt:67},{d:'09.09',rP:124920,rF:111672,rt:67},{d:'10.09',rP:133159,rF:102120,rt:61},{d:'11.09',rP:171440,rF:144148,rt:68},{d:'12.09',rP:154035,rF:133693,rt:66},{d:'13.09',rP:138405,rF:108825,rt:70},{d:'14.09',rP:90540,rF:73800,rt:61},{d:'15.09',rP:213810,rF:207876,rt:75},{d:'16.09',rP:169350,rF:124507,rt:62},{d:'17.09',rP:129317,rF:69217,rt:40},{d:'18.09',rP:75030,rF:75030,rt:49},{d:'19.09',rP:155006,rF:153224,rt:71},{d:'20.09',rP:108859,rF:85792,rt:58},{d:'21.09',rP:101820,rF:34227,rt:26},{d:'23.09',rP:40870,rF:46900,rt:42},{d:'29.09',rP:25200,rF:25200,rt:21}]
+  },
+  { name:'Окт\'25', full:'Октябрь 2025', revenueP:3817029, revenueF:3745095, marginP:2764063, marginF:2587191, unitsP:87783,  unitsF:87233,  rentaP:72, rentaF:69,
+    weeks:[{n:'Нед.40',rP:105120,rF:59620,ex:57},{n:'Нед.41',rP:773281,rF:764627,ex:99},{n:'Нед.42',rP:926095,rF:897447,ex:97}],
+    days:[{d:'01.10',rP:32500,rF:32500,rt:44},{d:'06.10',rP:89620,rF:71870,rt:63},{d:'07.10',rP:57841,rF:62139,rt:61},{d:'08.10',rP:145622,rF:151742,rt:74},{d:'09.10',rP:126774,rF:120522,rt:68},{d:'10.10',rP:148580,rF:161380,rt:74},{d:'11.10',rP:121314,rF:119764,rt:69},{d:'12.10',rP:83530,rF:77210,rt:62},{d:'13.10',rP:147026,rF:145968,rt:75},{d:'14.10',rP:173400,rF:152220,rt:69},{d:'15.10',rP:35775,rF:32070,rt:17},{d:'16.10',rP:117140,rF:116380,rt:65},{d:'17.10',rP:179110,rF:199385,rt:76},{d:'18.10',rP:141716,rF:137796,rt:70},{d:'19.10',rP:131928,rF:113628,rt:70},{d:'20.10',rP:176156,rF:181971,rt:77},{d:'21.10',rP:219286,rF:225476,rt:77},{d:'22.10',rP:256059,rF:249129,rt:77},{d:'23.10',rP:182728,rF:193078,rt:73},{d:'24.10',rP:195536,rF:188421,rt:66}]
+  },
+  { name:'Ноя\'25', full:'Ноябрь 2025',  revenueP:5498612, revenueF:5223789, marginP:3609527, marginF:3393663, unitsP:154854, unitsF:145936, rentaP:63, rentaF:65, weeks:[], days:[] },
+  { name:'Дек\'25', full:'Декабрь 2025', revenueP:5588501, revenueF:5255830, marginP:3672656, marginF:3371762, unitsP:136517, unitsF:126695, rentaP:63, rentaF:64, weeks:[], days:[] },
+  { name:'Янв\'26', full:'Январь 2026',  revenueP:1759694, revenueF:1782417, marginP:833139,  marginF:854104,  unitsP:52981,  unitsF:53316,  rentaP:47, rentaF:48, weeks:[], days:[] },
+  { name:'Фев\'26', full:'Февраль 2026', revenueP:3327822, revenueF:3070008, marginP:2023673, marginF:1787218, unitsP:80415,  unitsF:74229,  rentaP:61, rentaF:58, weeks:[], days:[] },
+  { name:'Мар\'26', full:'Март 2026',    revenueP:4133606, revenueF:3918865, marginP:2829029, marginF:2627996, unitsP:77241,  unitsF:72721,  rentaP:63, rentaF:67, weeks:[], days:[] },
+  { name:'Апр\'26', full:'Апрель 2026',  revenueP:2275003, revenueF:2232178, marginP:1354344, marginF:1335970, unitsP:null,   unitsF:null,   rentaP:60, rentaF:60, weeks:[], days:[] },
+];
+
+// All weeks combined (for rolling weekly chart)
+let allWeeks = [
+  {n:'Нед.27',rP:1120950,rF:894902,ex:80,mi:0},{n:'Нед.28',rP:1193460,rF:840312,ex:70,mi:0},
+  {n:'Нед.29',rP:1060720,rF:772882,ex:73,mi:0},{n:'Нед.30',rP:1013930,rF:938780,ex:93,mi:0},
+  {n:'Нед.31',rP:698250, rF:609210, ex:87,mi:1},{n:'Нед.32',rP:952935, rF:810270, ex:85,mi:1},
+  {n:'Нед.33',rP:749990, rF:606728, ex:81,mi:1},{n:'Нед.34',rP:611549, rF:543030, ex:89,mi:1},
+  {n:'Нед.35',rP:511588, rF:431992, ex:84,mi:1},{n:'Нед.36',rP:462566, rF:423782, ex:92,mi:2},
+  {n:'Нед.37',rP:917619, rF:780962, ex:85,mi:2},{n:'Нед.38',rP:953192, rF:749873, ex:79,mi:2},
+  {n:'Нед.39',rP:40870,  rF:46900,  ex:115,mi:2},{n:'Нед.40',rP:105120, rF:59620,  ex:57,mi:3},
+  {n:'Нед.41',rP:773281, rF:764627, ex:99,mi:3},{n:'Нед.42',rP:926095, rF:897447, ex:97,mi:3},
+];
+
+// Returns up to 10 weeks centered on / starting from a month
+function getWeeks10(monthIdx) {
+  // Find start index for this month's weeks
+  const idx = allWeeks.findIndex(w => w.mi === monthIdx);
+  if (idx === -1) return allWeeks.slice(-10); // months without week data → last 10
+  const start = Math.max(0, idx - Math.max(0, 10 - allWeeks.filter(w=>w.mi===monthIdx).length));
+  return allWeeks.slice(start, start + 10);
+}
+
+const hist = [
+  {m:'Мар\'23',v:616581},{m:'Апр\'23',v:757894},{m:'Май\'23',v:757730},{m:'Июн\'23',v:1357170},
+  {m:'Июл\'23',v:801613},{m:'Авг\'23',v:1598606},{m:'Сен\'23',v:2120614},{m:'Окт\'23',v:2007526},
+  {m:'Ноя\'23',v:2542930},{m:'Дек\'23',v:2817893},{m:'Янв\'24',v:1804545},{m:'Фев\'24',v:1022584},
+  {m:'Мар\'24',v:829431},{m:'Апр\'24',v:2479778},{m:'Май\'24',v:1305908},{m:'Июн\'24',v:2422580},
+  {m:'Июл\'24',v:2532380},{m:'Авг\'24',v:2327854}
+];
+
+const funnel = [
+  {lbl:'Холодные звонки',val:1370,col:'#58a6ff',cv:null},
+  {lbl:'КП (холодные)',   val:86,  col:'#388bfd',cv:'6.3%'},
+  {lbl:'Лиды входящие',  val:21,  col:'#bc8cff',cv:null},
+  {lbl:'КП (входящие)',  val:19,  col:'#a371f7',cv:'90.5%'},
+  {lbl:'Дожимы',         val:146, col:'#d29922',cv:null},
+  {lbl:'Назначено встреч',val:26, col:'#e3b341',cv:'13.1%'},
+  {lbl:'Встреч проведено',val:17, col:'#3fb950',cv:'65%'},
+  {lbl:'Договоров',      val:7,   col:'#2ea043',cv:'41%'},
+  {lbl:'Новых клиентов', val:3,   col:'#1a7f37',cv:'43%'},
+];
+
+const hrFunnel = [
+  {lbl:'Отправлено резюме',val:207,col:'#58a6ff',cv:null},
+  {lbl:'Дошло на собесед.',val:63, col:'#388bfd',cv:'30%'},
+  {lbl:'Ушли на стажировку',val:28,col:'#bc8cff',cv:'44%'},
+  {lbl:'Прошли адаптацию',val:6,  col:'#3fb950',cv:'21%'},
+];
+
+const weeklyCalls = [
+  {w:'Нед.40',calls:191,kp:7},{w:'Нед.41',calls:289,kp:14},{w:'Нед.42',calls:274,kp:19},{w:'Нед.43',calls:158,kp:6}
+];
+
+const weeklyMeetings = [
+  {w:'Нед.40',dozh:40,meet:6},{w:'Нед.41',dozh:45,meet:3},{w:'Нед.42',dozh:39,meet:2},{w:'Нед.43',dozh:42,meet:1}
+];
+
+// ===== HELPERS =====
+function fmt(n) {
+  if (n == null) return '–';
+  if (n >= 1e6) {
+    const v = Math.round(n / 1e5) / 10; // round to 1 decimal
+    return (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + ' млн';
+  }
+  if (n >= 1e3) return Math.round(n / 1000) + ' тыс.';
+  return n.toLocaleString('ru');
+}
+function execCls(p){ return p>=90?'exec-good':p>=70?'exec-ok':'exec-bad'; }
+function tagCls(p){ return p>=90?'tag-g':p>=70?'tag-y':'tag-r'; }
+
+let isDark = false;
+const THEMES = {
+  light:{ blue:'#0969da',green:'#1a7f37',purple:'#8250df',orange:'#9a6700',red:'#cf222e',teal:'#1a7f37',grid:'#d0d7de',text:'#57606a' },
+  dark: { blue:'#58a6ff',green:'#3fb950',purple:'#bc8cff',orange:'#e3b341',red:'#f85149',teal:'#39d353',grid:'#21262d',text:'#8b949e' }
+};
+const C = Object.assign({}, THEMES.light);
+// Returns light or dark rgba string based on current theme
+function th(l, d) { return isDark ? d : l; }
+
+// ===== DATA LABEL PLUGIN =====
+// Usage: pass in chart config's plugins array
+// opts: { datasets: [0,1] | 'all', formatter: fn, color: fn|string, fontSize: 10 }
+function barLabelPlugin(opts={}) {
+  return {
+    id: 'barLabel_'+Math.random(),
+    afterDatasetsDraw(chart) {
+      const {ctx} = chart;
+      chart.data.datasets.forEach((ds, di) => {
+        if (opts.datasets && opts.datasets !== 'all' && !opts.datasets.includes(di)) return;
+        const meta = chart.getDatasetMeta(di);
+        if (meta.hidden || meta.type !== 'bar') return;
+        meta.data.forEach((el, i) => {
+          const val = ds.data[i];
+          if (val == null || val === 0) return;
+          const text = opts.formatter ? opts.formatter(val, di, i) : String(val);
+          const clr = typeof opts.color === 'function' ? opts.color(val, di) :
+                      (opts.color || (typeof ds.borderColor === 'string' ? ds.borderColor : (isDark ? '#e6edf3' : '#24292f')));
+          ctx.save();
+          ctx.font = `600 ${opts.fontSize||10}px 'Segoe UI',sans-serif`;
+          ctx.fillStyle = clr;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(text, el.x, el.y - 3);
+          ctx.restore();
+        });
+      });
+    }
+  };
+}
+
+// Percent label plugin (for execution chart)
+function pctLabelPlugin(color) {
+  return barLabelPlugin({
+    datasets: 'all',
+    formatter: v => v + '%',
+    fontSize: 11,
+    color: color || (isDark ? '#e6edf3' : '#24292f')
+  });
+}
+
+let charts={};
+function killChart(id){ if(charts[id]){charts[id].destroy();delete charts[id];} }
+
+function baseOpts(type){
+  const T = isDark
+    ? {bg:'#1c2333',border:'#30363d',title:'#f0f6fc',body:'#8b949e'}
+    : {bg:'#ffffff',border:'#d0d7de',title:'#24292f',body:'#57606a'};
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{backgroundColor:T.bg,borderColor:T.border,borderWidth:1,
+        titleColor:T.title,bodyColor:T.body,padding:10,
+        callbacks:{label:ctx=>' '+ctx.dataset.label+': '+Math.round(ctx.raw).toLocaleString('ru')}
+      }
+    },
+    scales: (type==='bar'||type==='line') ? {
+      x:{grid:{display:false},ticks:{color:C.text,font:{size:10}}},
+      y:{grid:{display:false},ticks:{color:C.text,font:{size:10},callback:v=>fmt(v)}}
+    } : {}
+  };
+}
+
+// ===== СКЛАД =====
+let curMonth = months.length - 1;
+
+function buildMonthTabs(){
+  const row = document.getElementById('monthTabsRow');
+  const last = months.length - 1;
+  // Newest month first (right-to-left index order)
+  const reversed = months.map((m,i)=>i).reverse();
+  row.innerHTML = reversed.map(i=>
+    `<div class="month-tab${i===last?' active':''}" onclick="switchMonth(${i})">${months[i].name}</div>`
+  ).join('') + `<div class="month-tab" onclick="switchMonth(-1)">Все месяцы</div>`;
+}
+
+function switchMonth(i){
+  curMonth = i;
+  document.querySelectorAll('.month-tab').forEach((t,idx)=>{
+    // Tabs are in reversed order: idx=0 → months[last], idx=k → months[last-k]
+    const target = i===-1 ? months.length : (months.length - 1 - i);
+    t.classList.toggle('active', idx===target);
+  });
+  if(i===-1){ renderAllMonthsOverview(); }
+  else { renderMonth(months[i]); }
+}
+
+function updateKPIs(m){
+  const er = m.revenueF!=null ? Math.round(m.revenueF/m.revenueP*100) : null;
+  const em = m.marginF!=null ? Math.round(m.marginF/m.marginP*100) : null;
+  const eu = (m.unitsP&&m.unitsF) ? Math.round(m.unitsF/m.unitsP*100) : null;
+  const rd = m.rentaF - m.rentaP;
+
+  document.getElementById('kv-rev').innerHTML = fmt(m.revenueF)+' <span class="kpi-unit">руб.</span>';
+  document.getElementById('kv-rev-plan').textContent = 'план: '+fmt(m.revenueP);
+  document.getElementById('kv-rev-exec').className = 'kpi-exec '+execCls(er||0);
+  document.getElementById('kv-rev-exec').textContent = (er||'–')+'%';
+  document.getElementById('kv-rev-arr').innerHTML = er>=100?'<span class="arrow-up">▲</span>':'<span class="arrow-dn">▼</span>';
+
+  document.getElementById('kv-mar').innerHTML = fmt(m.marginF)+' <span class="kpi-unit">руб.</span>';
+  document.getElementById('kv-mar-plan').textContent = 'план: '+fmt(m.marginP);
+  document.getElementById('kv-mar-exec').className = 'kpi-exec '+execCls(em||0);
+  document.getElementById('kv-mar-exec').textContent = (em||'–')+'%';
+
+  document.getElementById('kv-ren').innerHTML = m.rentaF+'<span class="kpi-unit">%</span>';
+  document.getElementById('kv-ren-plan').textContent = 'план: '+m.rentaP+'%';
+  document.getElementById('kv-ren-exec').className = 'kpi-exec '+(rd>=0?'exec-good':'exec-bad');
+  document.getElementById('kv-ren-exec').textContent = (rd>=0?'+':'')+rd+'%';
+
+  if(m.unitsF!=null){
+    document.getElementById('kv-uni').innerHTML = m.unitsF.toLocaleString('ru')+' <span class="kpi-unit">шт.</span>';
+    document.getElementById('kv-uni-plan').textContent = 'план: '+m.unitsP.toLocaleString('ru');
+    document.getElementById('kv-uni-exec').className = 'kpi-exec '+execCls(eu||0);
+    document.getElementById('kv-uni-exec').textContent = (eu||'–')+'%';
+  } else {
+    document.getElementById('kv-uni').innerHTML = '— <span class="kpi-unit">шт.</span>';
+    document.getElementById('kv-uni-plan').textContent = '';
+    document.getElementById('kv-uni-exec').textContent = '';
+  }
+}
+
+function renderTestChart(){
+  killChart('test');
+  const o = baseOpts('bar');
+  o.plugins.legend = {display:false};
+  charts['test'] = new Chart(document.getElementById('testChart'),{
+    type:'bar',
+    data:{
+      labels: months.map(m=>m.name),
+      datasets:[{
+        label:'Выручка факт',
+        data: months.map(m=>m.revenueF),
+        backgroundColor: months.map((_,i)=> i%2===0 ? th('rgba(9,105,218,.65)','rgba(88,166,255,.7)') : th('rgba(26,127,55,.55)','rgba(63,185,80,.65)')),
+        borderRadius:5, borderSkipped:false
+      }]
+    },
+    options: o
+  });
+}
+
+function renderMonth(m){
+  document.getElementById('weekChartTitle').textContent = 'Выручка по неделям · '+m.full;
+  updateKPIs(m);
+  renderWeekly(m);
+  renderDaily(m);
+  renderTestChart();
+}
+
+function renderAllMonthsOverview(){
+  const agg = {
+    revenueP:months.reduce((s,m)=>s+m.revenueP,0),
+    revenueF:months.reduce((s,m)=>s+m.revenueF,0),
+    marginP:months.reduce((s,m)=>s+m.marginP,0),
+    marginF:months.reduce((s,m)=>s+m.marginF,0),
+    unitsP:months.reduce((s,m)=>s+(m.unitsP||0),0),
+    unitsF:months.reduce((s,m)=>s+(m.unitsF||0),0),
+    rentaP:Math.round(months.reduce((s,m)=>s+m.rentaP,0)/months.length),
+    rentaF:Math.round(months.reduce((s,m)=>s+m.rentaF,0)/months.length),
+    weeks:[], days:[]
+  };
+  document.getElementById('weekChartTitle').textContent = 'Все месяцы — нет детализации по неделям';
+  updateKPIs(agg);
+  killChart('weekly'); killChart('exec'); killChart('daily'); killChart('renta');
+  document.getElementById('weekChartWrap').innerHTML = '<div class="no-data"><div class="no-data-icon">📅</div>Выберите конкретный месяц для детализации</div>';
+  document.getElementById('dailyChartWrap').innerHTML = '<div class="no-data"><div class="no-data-icon">📅</div>Выберите конкретный месяц</div>';
+  document.getElementById('rentaChartWrap').innerHTML = '<div class="no-data"><div class="no-data-icon">📅</div>Выберите конкретный месяц</div>';
+  document.getElementById('execChartWrap').innerHTML = '<div class="no-data"><div class="no-data-icon">📅</div>Выберите конкретный месяц</div>';
+  renderTestChart();
+}
+
+function renderWeekly(m){
+  killChart('weekly'); killChart('exec');
+  document.getElementById('weekChartWrap').innerHTML = '<canvas id="weeklyChart"></canvas>';
+  document.getElementById('execChartWrap').innerHTML = '<canvas id="execChart"></canvas>';
+
+  // Use rolling 10-week window from allWeeks; fall back to no-data for months without weeks
+  const hasWeeks = allWeeks.some(w=>w.mi === months.indexOf(m));
+  const wks = hasWeeks ? getWeeks10(months.indexOf(m)) : [];
+
+  if(!wks.length){
+    document.getElementById('weekChartWrap').innerHTML = '<div class="no-data"><div class="no-data-icon">📋</div>Нет детализации по неделям</div>';
+    document.getElementById('execChartWrap').innerHTML = '<div class="no-data"><div class="no-data-icon">📋</div>Нет данных</div>';
+    return;
+  }
+
+  const curMi = months.indexOf(m);
+  const labels = wks.map(w=>w.n);
+
+  // Highlight current month's weeks; mute others
+  const planBg  = wks.map(w=>w.mi===curMi?th('rgba(9,105,218,.22)','rgba(88,166,255,.32)'):th('rgba(9,105,218,.07)','rgba(88,166,255,.15)'));
+  const planBdr = wks.map(w=>w.mi===curMi?C.blue:'rgba(88,166,255,.35)');
+  const factBg  = wks.map(w=>w.mi===curMi?th('rgba(26,127,55,.28)','rgba(63,185,80,.45)'):th('rgba(26,127,55,.08)','rgba(63,185,80,.15)'));
+  const factBdr = wks.map(w=>w.mi===curMi?C.green:th('rgba(26,127,55,.28)','rgba(63,185,80,.45)'));
+
+  const o1 = baseOpts('bar');
+  o1.plugins.tooltip.callbacks.label = ctx=>' '+ctx.dataset.label+': ₽ '+Math.round(ctx.raw).toLocaleString('ru');
+  o1.layout = {padding:{top:20}};
+  charts['weekly'] = new Chart(document.getElementById('weeklyChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'План',data:wks.map(w=>w.rP),backgroundColor:planBg,borderColor:planBdr,borderWidth:1.5,borderRadius:4},
+      {label:'Факт',data:wks.map(w=>w.rF),backgroundColor:factBg,borderColor:factBdr,borderWidth:1.5,borderRadius:4}
+    ]},
+    options:o1,
+    plugins:[barLabelPlugin({
+      datasets:[0,1],
+      fontSize:9,
+      formatter:(v,di,i)=> wks[i].mi===curMi ? fmt(v) : '',
+      color:(v,di)=>di===0?C.blue:C.green
+    })]
+  });
+
+  const exVals = wks.map(w=>w.ex);
+  const o2 = baseOpts('bar');
+  o2.scales.y.ticks.callback = v=>v+'%';
+  o2.scales.y.max = Math.max(120,...exVals)+10;
+  o2.plugins.tooltip.callbacks.label = ctx=>' Выполнение: '+ctx.raw+'%';
+  o2.layout = {padding:{top:20}};
+  charts['exec'] = new Chart(document.getElementById('execChart'),{
+    type:'bar',
+    data:{labels,datasets:[{
+      label:'%',
+      data:exVals,
+      backgroundColor:wks.map(w=>{
+        const hi = w.mi===curMi;
+        return w.ex>=90?(hi?'rgba(63,185,80,.55)':'rgba(63,185,80,.2)')
+                       :w.ex>=70?(hi?'rgba(210,153,34,.55)':'rgba(210,153,34,.2)')
+                                :(hi?th('rgba(207,34,46,.35)','rgba(248,81,73,.5)'):th('rgba(207,34,46,.12)','rgba(248,81,73,.2)'));
+      }),
+      borderColor:wks.map(w=>w.ex>=90?C.green:w.ex>=70?C.orange:C.red),
+      borderWidth:1.5,borderRadius:4
+    }]},
+    options:o2,
+    plugins:[barLabelPlugin({
+      datasets:'all',
+      fontSize:10,
+      formatter:(v,di,i)=>wks[i].mi===curMi?v+'%':'',
+      color:(v)=>v>=90?C.green:v>=70?C.orange:C.red
+    })]
+  });
+}
+
+function renderDaily(m){
+  killChart('daily'); killChart('renta');
+  document.getElementById('dailyChartWrap').innerHTML = '<canvas id="dailyChart"></canvas>';
+  document.getElementById('rentaChartWrap').innerHTML = '<canvas id="rentaChart"></canvas>';
+
+  if(!m.days.length){
+    document.getElementById('dailyChartWrap').innerHTML = '<div class="no-data"><div class="no-data-icon">📋</div>Нет детализации по дням</div>';
+    document.getElementById('rentaChartWrap').innerHTML = '<div class="no-data"><div class="no-data-icon">📋</div>Нет данных</div>';
+    return;
+  }
+
+  const days = m.days.filter(d=>d.rF>0||d.rP>0);
+  const labels = days.map(d=>d.d);
+
+  const o1 = baseOpts('line');
+  o1.elements = {point:{radius:4,hoverRadius:7},line:{tension:.42}};
+  o1.plugins.tooltip.callbacks.label = ctx=>' '+ctx.dataset.label+': ₽ '+Math.round(ctx.raw).toLocaleString('ru');
+  charts['daily'] = new Chart(document.getElementById('dailyChart'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'План',data:days.map(d=>d.rP),borderColor:th('rgba(139,148,158,.5)','rgba(139,148,158,.4)'),borderWidth:1.5,backgroundColor:'transparent',borderDash:[5,4],pointRadius:0,pointHoverRadius:4},
+      {label:'Факт',data:days.map(d=>d.rF),borderColor:C.blue,borderWidth:2.5,backgroundColor:th('rgba(9,105,218,.09)','rgba(88,166,255,.14)'),fill:true,pointRadius:4,pointBackgroundColor:C.blue,pointBorderColor:'#fff',pointBorderWidth:1.5}
+    ]},options:o1
+  });
+
+  const vals = days.map(d=>d.rt);
+  const o2 = baseOpts('line');
+  o2.elements = {point:{radius:4,hoverRadius:7},line:{tension:.42}};
+  o2.scales.y.ticks.callback = v=>v+'%';
+  o2.plugins.tooltip.callbacks.label = ctx=>' Рент.: '+ctx.raw+'%';
+  charts['renta'] = new Chart(document.getElementById('rentaChart'),{
+    type:'line',
+    data:{labels,datasets:[{
+      label:'Рентабельность',data:vals,borderColor:C.purple,borderWidth:2,
+      backgroundColor:'rgba(188,140,255,.07)',fill:true,
+      pointBackgroundColor:vals.map(v=>v<0?C.red:v<40?C.orange:C.purple),pointRadius:3
+    }]},options:o2
+  });
+}
+
+let monthChartMode = 'fact'; // 'both' | 'fact'
+let monthChartRange = 'all'; // 'all' | '2025' | '2026' | '6m' | '3m'
+
+// months indices: 0-5 = Jul-Dec 2025, 6-9 = Jan-Apr 2026
+const rangeConfig = {
+  all:  { indices: [0,1,2,3,4,5,6,7,8,9], label: 'Июл 2025 — Апр 2026' },
+  '2025':{ indices: [0,1,2,3,4,5],          label: 'Июл — Дек 2025' },
+  '2026':{ indices: [6,7,8,9],              label: 'Янв — Апр 2026' },
+  '6m':  { indices: [4,5,6,7,8,9],          label: 'Ноя 2025 — Апр 2026' },
+  '3m':  { indices: [7,8,9],                label: 'Фев — Апр 2026' },
+};
+
+function setMonthRange(range) {
+  monthChartRange = range;
+  ['all','2025','2026','6m','3m'].forEach(r => {
+    document.getElementById('rng-'+r).classList.toggle('active', r === range);
+  });
+  document.getElementById('rangeHint').textContent = rangeConfig[range].label;
+  renderAllMonthsChart();
+}
+
+function setMonthChartMode(mode) {
+  monthChartMode = mode;
+  document.getElementById('tog-fact').classList.toggle('active', mode==='fact');
+  document.getElementById('tog-both').classList.toggle('active', mode==='both');
+  document.getElementById('tog-table').classList.toggle('active', mode==='table');
+  const leg = document.getElementById('allMonthsLegend');
+  leg.style.display = (mode==='fact'||mode==='table') ? 'none' : 'flex';
+  document.getElementById('allMonthsSub').textContent =
+    mode==='fact'  ? 'Все месяцы · только факт' :
+    mode==='table' ? 'Все месяцы · таблица + линии' :
+                     'Все месяцы · план vs факт';
+  renderAllMonthsChart();
+}
+
+function renderAllMonthsChart(){
+  const idxs = rangeConfig[monthChartRange].indices;
+  const mSlice = idxs.map(i=>months[i]);
+  const labels = mSlice.map(m=>m.name);
+
+  const barWrap   = document.getElementById('allMonthsBarWrap');
+  const tableView = document.getElementById('allMonthsTableView');
+
+  if(monthChartMode === 'table') {
+    killChart('allMonths');
+    barWrap.style.display   = 'none';
+    tableView.style.display = 'flex';
+    renderAllMonthsTableLine(mSlice, labels);
+  } else {
+    killChart('allMonthsLine');
+    barWrap.style.display   = '';
+    tableView.style.display = 'none';
+
+    killChart('allMonths');
+    const fontSize = idxs.length <= 4 ? 11 : idxs.length <= 6 ? 10 : 9;
+    const o = baseOpts('bar');
+    o.plugins.tooltip.callbacks.label = ctx=>' '+ctx.dataset.label+': ₽ '+Math.round(ctx.raw).toLocaleString('ru');
+    o.layout = {padding:{top:20}};
+
+    const datasets = monthChartMode === 'fact'
+      ? [{label:'Факт',data:mSlice.map(m=>m.revenueF),backgroundColor:th('rgba(26,127,55,.28)','rgba(63,185,80,.45)'),borderColor:C.green,borderWidth:1.5,borderRadius:5}]
+      : [
+          {label:'План',data:mSlice.map(m=>m.revenueP),backgroundColor:''+th('rgba(9,105,218,.15)','rgba(88,166,255,.22)')+'',borderColor:C.blue,borderWidth:1.5,borderRadius:4},
+          {label:'Факт',data:mSlice.map(m=>m.revenueF),backgroundColor:th('rgba(26,127,55,.25)','rgba(63,185,80,.4)'),borderColor:C.green,borderWidth:1.5,borderRadius:4}
+        ];
+    const labelDsIndices = monthChartMode === 'fact' ? [0] : [0,1];
+    const labelColors = monthChartMode === 'fact' ? ()=>C.green : (v,di)=>di===0?C.blue:C.green;
+    charts['allMonths'] = new Chart(document.getElementById('allMonthsChart'),{
+      type:'bar', data:{labels,datasets}, options:o,
+      plugins:[barLabelPlugin({datasets:labelDsIndices,fontSize,formatter:v=>fmt(v),color:labelColors})]
+    });
+  }
+
+  // Units chart — always rendered
+  killChart('units');
+  const ou = baseOpts('bar');
+  ou.plugins.tooltip.callbacks.label = ctx=>' '+ctx.dataset.label+': '+Math.round(ctx.raw).toLocaleString('ru')+' шт.';
+  ou.scales.y.ticks.callback = v=>(v/1000).toFixed(0)+'к';
+  ou.layout = {padding:{top:16}};
+  charts['units'] = new Chart(document.getElementById('unitsChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'План',data:months.map(m=>m.unitsP||0),backgroundColor:th('rgba(130,80,223,.15)','rgba(188,140,255,.25)'),borderColor:C.purple,borderWidth:1.5,borderRadius:4},
+      {label:'Факт',data:months.map(m=>m.unitsF||0),backgroundColor:th('rgba(154,103,0,.2)','rgba(210,153,34,.4)'),borderColor:C.orange,borderWidth:1.5,borderRadius:4}
+    ]},
+    options:ou,
+    plugins:[barLabelPlugin({datasets:[1],fontSize:9,formatter:v=>v?(v/1000).toFixed(0)+'к':'–',color:C.orange})]
+  });
+}
+
+function renderAllMonthsTableLine(mSlice, labels) {
+  // ── Table ──
+  const borderC = isDark ? '#21262d' : '#d0d7de';
+  const textC   = isDark ? '#e6edf3' : '#24292f';
+  const subC    = isDark ? '#8b949e' : '#57606a';
+  const bgAlt   = isDark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.025)';
+
+  document.getElementById('allMonthsTableEl').innerHTML = `
+    <table style="border-collapse:collapse;font-size:11.5px;width:100%">
+      <thead>
+        <tr>
+          <th style="padding:6px 12px 6px 0;border-bottom:2px solid ${borderC};text-align:left;color:${subC};white-space:nowrap">Месяц</th>
+          <th style="padding:6px 10px;border-bottom:2px solid ${borderC};text-align:right;color:${C.blue};white-space:nowrap">План</th>
+          <th style="padding:6px 10px;border-bottom:2px solid ${borderC};text-align:right;color:${C.green};white-space:nowrap">Факт</th>
+          <th style="padding:6px 0 6px 10px;border-bottom:2px solid ${borderC};text-align:right;color:${C.orange};white-space:nowrap">Разница</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${mSlice.map((m,j)=>{
+          const diff = (m.revenueF!=null&&m.revenueP!=null) ? m.revenueF-m.revenueP : null;
+          const dStr = diff==null ? '–' : (diff>0?'+':'')+fmt(diff);
+          const dClr = diff==null ? subC : diff>=0 ? C.green : C.red;
+          const bg   = j%2===1 ? `background:${bgAlt}` : '';
+          return `<tr style="${bg}">
+            <td style="padding:5px 12px 5px 0;border-bottom:1px solid ${borderC};color:${textC};font-weight:600">${m.name}</td>
+            <td style="padding:5px 10px;border-bottom:1px solid ${borderC};text-align:right;color:${textC}">${fmt(m.revenueP)}</td>
+            <td style="padding:5px 10px;border-bottom:1px solid ${borderC};text-align:right;color:${textC}">${fmt(m.revenueF)}</td>
+            <td style="padding:5px 0 5px 10px;border-bottom:1px solid ${borderC};text-align:right;color:${dClr};font-weight:700">${dStr}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+
+  // ── Line chart ──
+  killChart('allMonthsLine');
+
+  const planData = mSlice.map(m=>m.revenueP);
+  const factData = mSlice.map(m=>m.revenueF);
+
+  // Plugin: value labels on each point
+  const ptLabelPlugin = {
+    id:'ptLabels',
+    afterDatasetsDraw(chart){
+      const {ctx} = chart;
+      chart.data.datasets.forEach((ds,di)=>{
+        const meta = chart.getDatasetMeta(di);
+        if(meta.hidden) return;
+        meta.data.forEach((el,i)=>{
+          const v = ds.data[i];
+          if(v==null) return;
+          ctx.save();
+          ctx.font = `600 9px 'Segoe UI',sans-serif`;
+          ctx.fillStyle = di===0 ? C.red : C.green;
+          ctx.textAlign = 'center';
+          if(di===0){ ctx.textBaseline='bottom'; ctx.fillText(fmt(v), el.x, el.y-5); }
+          else       { ctx.textBaseline='top';    ctx.fillText(fmt(v), el.x, el.y+5); }
+          ctx.restore();
+        });
+      });
+    }
+  };
+
+  // Plugin: difference label between the two lines
+  const diffLabelPlugin = {
+    id:'diffLabels',
+    afterDatasetsDraw(chart){
+      if(chart.data.datasets.length<2) return;
+      const {ctx} = chart;
+      const m0 = chart.getDatasetMeta(0).data;
+      const m1 = chart.getDatasetMeta(1).data;
+      m0.forEach((el0,i)=>{
+        const el1 = m1[i];
+        const p = chart.data.datasets[0].data[i];
+        const f = chart.data.datasets[1].data[i];
+        if(p==null||f==null) return;
+        const diff = f - p;
+        const midY = (el0.y + el1.y) / 2;
+        const clr  = diff>=0 ? C.green : C.red;
+        const str  = (diff>0?'+':'')+fmt(diff);
+        ctx.save();
+        ctx.font = `700 9px 'Segoe UI',sans-serif`;
+        ctx.fillStyle = clr;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(str, el0.x, midY);
+        ctx.restore();
+      });
+    }
+  };
+
+  const o = baseOpts('line');
+  o.layout = {padding:{top:28,bottom:28,left:4,right:4}};
+  o.plugins.legend = {
+    display: true, position:'bottom',
+    labels: {color:C.text, boxWidth:14, font:{size:11}, padding:10}
+  };
+  o.plugins.tooltip.callbacks.label = ctx=>' '+ctx.dataset.label+': '+fmt(ctx.raw);
+
+  charts['allMonthsLine'] = new Chart(document.getElementById('allMonthsLineCanvas'),{
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {
+          label:'План',
+          data: planData,
+          borderColor: C.red,
+          backgroundColor: 'transparent',
+          pointBackgroundColor: C.red,
+          pointBorderColor: '#fff', pointBorderWidth: 1.5,
+          pointRadius: 5, pointHoverRadius: 7,
+          borderWidth: 2.5,
+          tension: 0.42, fill: false, order: 1
+        },
+        {
+          label:'Факт',
+          data: factData,
+          borderColor: C.green,
+          backgroundColor: th('rgba(210,153,34,.12)','rgba(210,153,34,.18)'),
+          pointBackgroundColor: C.green,
+          pointBorderColor: '#fff', pointBorderWidth: 1.5,
+          pointRadius: 5, pointHoverRadius: 7,
+          borderWidth: 2.5,
+          tension: 0.42, fill:'-1', order: 2
+        }
+      ]
+    },
+    options: o,
+    plugins: [ptLabelPlugin, diffLabelPlugin]
+  });
+}
+
+// ===== ПРОДАЖИ =====
+function renderSales(){
+  const wrap = document.getElementById('salesFunnelWrap');
+  wrap.innerHTML = funnel.map(f=>`
+    <div class="f-item">
+      <div class="f-label">${f.lbl}</div>
+      <div class="f-bar-bg">
+        <div class="f-bar" style="width:${Math.max(4,Math.round(f.val/1370*100))}%;background:${f.col}">${f.val}</div>
+      </div>
+      <div class="f-cv" style="color:${f.col}">${f.cv||''}</div>
+    </div>`).join('');
+
+  killChart('cv');
+  const cvLabels = ['Звонок→КП','Лид→КП','Дожим→Встреча','Встреча→Договор','Договор→Клиент'];
+  const cvVals = [6.3,90.5,13.1,41,43];
+  const oc = baseOpts('bar');
+  oc.indexAxis = 'y';
+  oc.scales.x = {grid:{color:C.grid},ticks:{color:C.text,font:{size:10},callback:v=>v+'%'},max:100};
+  oc.scales.y = {grid:{display:false},ticks:{color:C.text,font:{size:11}}};
+  oc.plugins.tooltip.callbacks.label = ctx=>' CV%: '+ctx.raw+'%';
+  charts['cv'] = new Chart(document.getElementById('cvChart'),{
+    type:'bar',
+    data:{labels:cvLabels,datasets:[{
+      label:'CV%',data:cvVals,
+      backgroundColor:cvVals.map(v=>v>=50?th('rgba(26,127,55,.28)','rgba(63,185,80,.45)'):v>=15?'rgba(210,153,34,.4)':'rgba(88,166,255,.4)'),
+      borderColor:cvVals.map(v=>v>=50?C.green:v>=15?C.orange:C.blue),
+      borderWidth:1.5,borderRadius:4
+    }]},options:oc
+  });
+
+  killChart('calls');
+  const ow = baseOpts('bar');
+  ow.plugins.tooltip.callbacks.label = ctx=>' '+ctx.dataset.label+': '+ctx.raw;
+  charts['calls'] = new Chart(document.getElementById('callsChart'),{
+    type:'bar',
+    data:{labels:weeklyCalls.map(w=>w.w),datasets:[
+      {label:'Звонки',data:weeklyCalls.map(w=>w.calls),backgroundColor:th('rgba(9,105,218,.22)','rgba(88,166,255,.32)'),borderColor:C.blue,borderWidth:1.5,borderRadius:4},
+      {label:'КП',data:weeklyCalls.map(w=>w.kp),backgroundColor:th('rgba(26,127,55,.28)','rgba(63,185,80,.45)'),borderColor:C.green,borderWidth:1.5,borderRadius:4}
+    ]},options:ow
+  });
+
+  killChart('meetings');
+  const om = baseOpts('bar');
+  om.plugins.tooltip.callbacks.label = ctx=>' '+ctx.dataset.label+': '+ctx.raw;
+  charts['meetings'] = new Chart(document.getElementById('meetingsChart'),{
+    type:'bar',
+    data:{labels:weeklyMeetings.map(w=>w.w),datasets:[
+      {label:'Дожимы',data:weeklyMeetings.map(w=>w.dozh),backgroundColor:th('rgba(154,103,0,.18)','rgba(210,153,34,.3)'),borderColor:C.orange,borderWidth:1.5,borderRadius:4},
+      {label:'Встреч назначено',data:weeklyMeetings.map(w=>w.meet),backgroundColor:th('rgba(26,127,55,.28)','rgba(63,185,80,.45)'),borderColor:C.green,borderWidth:1.5,borderRadius:4}
+    ]},options:om
+  });
+}
+
+// ===== HR =====
+function renderHR(){
+  const wrap = document.getElementById('hrFunnelWrap');
+  wrap.innerHTML = hrFunnel.map(f=>`
+    <div class="f-item">
+      <div class="f-label">${f.lbl}</div>
+      <div class="f-bar-bg">
+        <div class="f-bar" style="width:${Math.max(4,Math.round(f.val/207*100))}%;background:${f.col}">${f.val}</div>
+      </div>
+      <div class="f-cv" style="color:${f.col}">${f.cv||''}</div>
+    </div>`).join('');
+
+  killChart('hrRoles');
+  const or = baseOpts('bar');
+  or.indexAxis = 'y';
+  or.scales.x = {grid:{color:C.grid},ticks:{color:C.text,font:{size:10}}};
+  or.scales.y = {grid:{display:false},ticks:{color:C.text,font:{size:11}}};
+  or.plugins.tooltip.callbacks.label = ctx=>' '+ctx.dataset.label+': '+ctx.raw;
+  charts['hrRoles'] = new Chart(document.getElementById('hrRolesChart'),{
+    type:'bar',
+    data:{
+      labels:['Склад','МОПы','РОПы','Операторы КЦ'],
+      datasets:[
+        {label:'Дозвоны / Резюме',data:[207,299,155,83],backgroundColor:th('rgba(9,105,218,.22)','rgba(88,166,255,.32)'),borderColor:C.blue,borderWidth:1.5,borderRadius:4},
+        {label:'Офферы',data:[28,11,1,0],backgroundColor:th('rgba(26,127,55,.28)','rgba(63,185,80,.45)'),borderColor:C.green,borderWidth:1.5,borderRadius:4},
+        {label:'Вышли',data:[6,0,0,0],backgroundColor:'rgba(188,140,255,.4)',borderColor:C.purple,borderWidth:1.5,borderRadius:4}
+      ]
+    },options:or
+  });
+}
+
+// ===== ФИНАНСЫ =====
+function renderFin(){
+  killChart('finRev'); killChart('finRenta'); killChart('hist');
+
+  const labels = months.map(m=>m.name);
+
+  const of = baseOpts('bar');
+  of.plugins.tooltip.callbacks.label = ctx=>' '+ctx.dataset.label+': ₽ '+Math.round(ctx.raw).toLocaleString('ru');
+  charts['finRev'] = new Chart(document.getElementById('finRevChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'План',data:months.map(m=>m.revenueP),backgroundColor:th('rgba(9,105,218,.18)','rgba(88,166,255,.25)'),borderColor:C.blue,borderWidth:1.5,borderRadius:5},
+      {label:'Факт',data:months.map(m=>m.revenueF),backgroundColor:th('rgba(26,127,55,.25)','rgba(63,185,80,.4)'),borderColor:C.green,borderWidth:1.5,borderRadius:5}
+    ]},options:of
+  });
+
+  const ore = baseOpts('line');
+  ore.elements = {point:{radius:4,hoverRadius:7},line:{tension:.42}};
+  ore.scales.y.ticks.callback = v=>v+'%';
+  ore.plugins.tooltip.callbacks.label = ctx=>' '+ctx.dataset.label+': '+ctx.raw+'%';
+  charts['finRenta'] = new Chart(document.getElementById('finRentaChart'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'План %',data:months.map(m=>m.rentaP),borderColor:'rgba(139,148,158,.5)',borderWidth:1.5,borderDash:[5,4],backgroundColor:'transparent',pointRadius:3},
+      {label:'Факт %',data:months.map(m=>m.rentaF),borderColor:C.purple,borderWidth:2.5,backgroundColor:'rgba(188,140,255,.08)',fill:true}
+    ]},options:ore
+  });
+
+  const oh = baseOpts('line');
+  oh.elements = {point:{radius:4,hoverRadius:7},line:{tension:.42}};
+  oh.plugins.tooltip.callbacks.label = ctx=>' Выручка: ₽ '+Math.round(ctx.raw).toLocaleString('ru');
+  charts['hist'] = new Chart(document.getElementById('histChart'),{
+    type:'line',
+    data:{labels:hist.map(h=>h.m),datasets:[{
+      label:'Выручка',data:hist.map(h=>h.v),
+      borderColor:C.teal,borderWidth:2,backgroundColor:'rgba(57,211,83,.07)',fill:true
+    }]},options:oh
+  });
+
+  const tbody = document.getElementById('finTableBody');
+  tbody.innerHTML = months.map(m=>{
+    const ex = Math.round(m.revenueF/m.revenueP*100);
+    const rd = m.rentaF - m.rentaP;
+    return `<tr>
+      <td style="color:#f0f6fc;font-weight:500">${m.full}</td>
+      <td>₽ ${m.revenueF.toLocaleString('ru')}</td>
+      <td>₽ ${m.marginF.toLocaleString('ru')}</td>
+      <td><span class="tag ${rd>=0?'tag-g':'tag-r'}">${m.rentaF}%</span></td>
+      <td><span class="tag ${tagCls(ex)}">${ex}%</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ===== КОПы (ключевые операционные показатели) =====
+// Данные из листа «КОпы» таблицы найма. Итоги воронки = строки «Месяц» листа.
+// Структура: VAC_DATA[вакансия][месяц] = {month:[итоги этапов], weeks:[...], days:[...]}
+const VAC_DATA = {
+  mopy:{
+    "Февраль 2026":{month:[299,62,23,null,11,0,null],weeks:[{w:"10.02–13.02",s:[83,9,5,0,1,0,0]},{w:"16.02–20.02",s:[122,31,11,0,6,0,0]},{w:"24.02–27.02",s:[94,22,7,0,4,0,0]}],days:[{d:"10.02",s:[17,0,0,0,0,0,0]},{d:"11.02",s:[20,5,3,0,1,0,0]},{d:"12.02",s:[28,1,1,0,0,0,0]},{d:"13.02",s:[18,3,1,0,0,0,0]},{d:"16.02",s:[32,4,1,0,0,0,0]},{d:"17.02",s:[24,7,3,0,3,0,0]},{d:"18.02",s:[30,10,4,0,2,0,0]},{d:"19.02",s:[21,5,3,0,1,0,0]},{d:"20.02",s:[15,5,0,0,0,0,0]},{d:"24.02",s:[15,5,2,0,2,0,0]},{d:"25.02",s:[31,3,1,0,0,0,0]},{d:"26.02",s:[23,10,1,0,1,0,0]},{d:"27.02",s:[25,4,3,0,1,0,0]}]},
+    "Июнь 2026":{month:[85,66,47,40,20,4,1],weeks:[{w:"05.06–05.06",s:[12,0,0,0,0,0,0]},{w:"08.06–11.06",s:[32,26,19,19,7,1,1]},{w:"15.06–19.06",s:[34,32,23,20,12,3,0]},{w:"25.06–26.06",s:[6,2,2,0,0,0,0]},{w:"29.06–30.06",s:[1,6,3,1,1,0,0]}],days:[{d:"05.06",s:[12,0,0,0,0,0,0]},{d:"08.06",s:[14,6,2,2,2,1,1]},{d:"09.06",s:[8,10,9,9,4,0,0]},{d:"10.06",s:[2,6,4,4,1,0,0]},{d:"11.06",s:[8,4,4,4,0,0,0]},{d:"15.06",s:[7,3,2,2,1,0,0]},{d:"16.06",s:[9,6,4,4,2,0,0]},{d:"17.06",s:[10,6,5,5,2,0,0]},{d:"18.06",s:[8,11,7,5,5,2,0]},{d:"19.06",s:[0,6,5,4,2,1,0]},{d:"25.06",s:[3,0,0,0,0,0,0]},{d:"26.06",s:[3,2,2,0,0,0,0]},{d:"29.06",s:[1,5,2,0,0,0,0]},{d:"30.06",s:[0,1,1,1,1,0,0]}]},
+    "Июль 2026":{month:[25,20,5,2,2,0,0],weeks:[{w:"01.07–03.07",s:[25,12,5,2,2,0,0]},{w:"06.07–06.07",s:[0,8,0,0,0,0,0]}],days:[{d:"01.07",s:[8,0,0,0,0,0,0]},{d:"02.07",s:[7,6,3,0,0,0,0]},{d:"03.07",s:[10,6,2,2,2,0,0]},{d:"06.07",s:[0,8,0,0,0,0,0]}]}
+  },
+  ropy:{},
+  sklad:{
+    "Декабрь 2025":{month:[207,63,28,6],weeks:[{w:"01.12–05.12",s:[40,10,7,0]},{w:"08.12–12.12",s:[45,14,6,2]},{w:"15.12–19.12",s:[71,24,12,2]},{w:"22.12–25.12",s:[51,15,3,2]}],days:[{d:"01.12",s:[8,3,2,0]},{d:"02.12",s:[18,4,2,0]},{d:"03.12",s:[5,0,0,0]},{d:"04.12",s:[6,2,2,0]},{d:"05.12",s:[3,1,1,0]},{d:"08.12",s:[8,1,0,1]},{d:"09.12",s:[1,1,0,1]},{d:"10.12",s:[12,3,3,0]},{d:"11.12",s:[9,3,0,0]},{d:"12.12",s:[15,6,3,0]},{d:"15.12",s:[8,3,2,0]},{d:"16.12",s:[4,1,1,0]},{d:"17.12",s:[20,4,0,0]},{d:"18.12",s:[18,7,1,0]},{d:"19.12",s:[21,9,8,2]},{d:"22.12",s:[10,0,0,1]},{d:"23.12",s:[16,9,2,0]},{d:"24.12",s:[15,3,0,1]},{d:"25.12",s:[10,3,1,0]}]},
+    "Январь 2026":{month:[12,2,1,0],weeks:[{w:"29.01–30.01",s:[12,2,1,0]}],days:[{d:"29.01",s:[3,0,0,0]},{d:"30.01",s:[9,2,1,0]}]},
+    "Февраль 2026":{month:[155,44,5,1],weeks:[{w:"02.02–06.02",s:[51,13,0,0]},{w:"09.02–13.02",s:[27,3,0,1]},{w:"16.02–20.02",s:[54,21,3,0]},{w:"24.02–27.02",s:[23,7,2,0]}],days:[{d:"02.02",s:[12,3,0,0]},{d:"03.02",s:[5,2,0,0]},{d:"04.02",s:[12,4,0,0]},{d:"05.02",s:[10,1,0,0]},{d:"06.02",s:[12,3,0,0]},{d:"09.02",s:[10,2,0,0]},{d:"12.02",s:[8,1,0,0]},{d:"13.02",s:[9,0,0,1]},{d:"16.02",s:[11,3,0,0]},{d:"17.02",s:[10,3,0,0]},{d:"18.02",s:[10,5,0,0]},{d:"19.02",s:[12,5,2,0]},{d:"20.02",s:[11,5,1,0]},{d:"24.02",s:[11,2,0,0]},{d:"25.02",s:[5,1,0,0]},{d:"26.02",s:[3,1,0,0]},{d:"27.02",s:[4,3,2,0]}]},
+    "Март 2026":{month:[83,22,10,2],weeks:[{w:"02.03–06.03",s:[49,5,0,0]},{w:"09.03–11.03",s:[34,17,1,0]}],days:[{d:"02.03",s:[2,0,0,0]},{d:"03.03",s:[10,5,0,0]},{d:"04.03",s:[4,0,0,0]},{d:"06.03",s:[33,0,0,0]},{d:"09.03",s:[15,7,1,0]},{d:"10.03",s:[4,3,0,0]},{d:"11.03",s:[15,7,0,0]}]},
+    "Июнь 2026":{month:[60,23,5,1],weeks:[{w:"01.06–05.06",s:[35,14,2,1]},{w:"08.06–12.06",s:[24,9,3,0]},{w:"15.06–15.06",s:[1,0,0,0]}],days:[{d:"01.06",s:[4,1,0,0]},{d:"02.06",s:[10,4,2,1]},{d:"03.06",s:[10,6,0,0]},{d:"04.06",s:[6,1,0,0]},{d:"05.06",s:[5,2,0,0]},{d:"08.06",s:[6,1,1,0]},{d:"09.06",s:[6,1,1,0]},{d:"10.06",s:[3,2,0,0]},{d:"11.06",s:[4,3,1,0]},{d:"12.06",s:[5,2,0,0]},{d:"15.06",s:[1,0,0,0]}]}
+  },
+  akkaunt:{
+    "Февраль 2026":{month:[69,14,5,4,2],weeks:[{w:"10.02–13.02",s:[64,8,3,3,0]},{w:"16.02–19.02",s:[5,6,2,1,2]}],days:[{d:"10.02",s:[10,0,0,0,0]},{d:"11.02",s:[24,1,0,0,0]},{d:"12.02",s:[20,3,1,1,0]},{d:"13.02",s:[10,4,2,2,0]},{d:"16.02",s:[5,4,0,0,1]},{d:"17.02",s:[0,2,2,1,0]},{d:"19.02",s:[0,0,0,0,1]}]}
+  },
+};
+
+// Названия этапов воронки по вакансиям (из шапки листа «КОпы»)
+const VAC_META = {
+  mopy:   {name:'МОПы (удалённо)', stages:['Дозвоны','Назначено на сегодня','Дошли до интервью','Передано РОПу','Офферы','Вышли на стажировку','Прошли адаптацию 2 нед.']},
+  ropy:   {name:'РОПы',           stages:['Дозвоны','Назначено на сегодня','Дошло','Офферы','Вышли на стажировку']},
+  sklad:  {name:'Склад',          stages:['Отправлено','Дошло','Остались на стажировку','Прошёл адаптацию 5 д.']},
+  akkaunt:{name:'Аккаунт',        stages:['Дозвоны','Назначено на сегодня','Дошло','Офферы','Вышли на стажировку']},
+};
+// Палитра этапов по количеству
+const STAGE_PAL = {
+  7:['#58a6ff','#388bfd','#a371f7','#bc8cff','#e3b341','#3fb950','#12855a'],
+  6:['#58a6ff','#388bfd','#a371f7','#bc8cff','#e3b341','#3fb950'],
+  5:['#58a6ff','#a371f7','#bc8cff','#e3b341','#3fb950'],
+  4:['#58a6ff','#a371f7','#e3b341','#3fb950'],
+};
+const WEEK_COLS = ['blue','purple','orange'];
+const DAY_COLS  = ['blue','green'];
+
+let kopyDept = 'hr';
+
+function switchKopyDept(d){
+  if(d!=='hr'&&d!=='prodazhi') return;
+  kopyDept = d;
+  document.querySelectorAll('#kopyDeptTabs .month-tab').forEach(t=>t.classList.toggle('active', t.dataset.kdept===d));
+  document.getElementById('kopy-hr').style.display       = d==='hr' ? '' : 'none';
+  document.getElementById('kopy-prodazhi').style.display = d==='prodazhi' ? '' : 'none';
+  renderKopy();
+  saveNav();
+}
+
+// Вакансии внутри HR-найма
+const hrVacs = {
+  mopy:   {title:'Найм · МОПы (удалённо)'},
+  ropy:   {title:'Найм · РОПы'},
+  sklad:  {title:'Найм · Склад'},
+  akkaunt:{title:'Найм · Аккаунт'},
+};
+const VAC_ORDER = ['mopy','ropy','sklad','akkaunt'];
+let hrVac = 'mopy';
+
+// ---- Фильтр по месяцам ----
+const mopMonthsList = [
+  'Ноябрь 2024','Декабрь 2024','Январь 2025','Февраль 2025','Март 2025','Апрель 2025',
+  'Май 2025','Июнь 2025','Июль 2025','Август 2025','Сентябрь 2025','Октябрь 2025',
+  'Ноябрь 2025','Декабрь 2025','Январь 2026','Февраль 2026','Март 2026','Апрель 2026',
+  'Май 2026','Июнь 2026','Июль 2026','Август 2026'
+];
+let mopSelMonth = 'Июнь 2026';
+
+// Месяцы с данными для конкретной вакансии (для точки-индикатора)
+function vacMonthsSet(vac){ return new Set(Object.keys(VAC_DATA[vac]||{})); }
+
+const _MSHORT = {'Январь':'Янв','Февраль':'Фев','Март':'Мар','Апрель':'Апр','Май':'Май','Июнь':'Июн','Июль':'Июл','Август':'Авг','Сентябрь':'Сен','Октябрь':'Окт','Ноябрь':'Ноя','Декабрь':'Дек'};
+function _mshort(full){ const [mn,y]=full.split(' '); return _MSHORT[mn]+"'"+y.slice(2); }
+
+function buildMopMonthTabs(){
+  const row = document.getElementById('mopMonthTabs');
+  if(!row) return;
+  const has = vacMonthsSet(hrVac);
+  const rev = [...mopMonthsList].reverse(); // новые слева
+  row.innerHTML = rev.map(m=>{
+    const act = m===mopSelMonth ? ' active' : '';
+    const dot = has.has(m) ? '<span class="mf-dot"></span>' : '';
+    const style = has.has(m) ? '' : 'opacity:.5';
+    return `<div class="month-tab${act}" style="${style}" onclick="selectMopMonth('${m}')">${_mshort(m)}${dot}</div>`;
+  }).join('');
+}
+
+function selectMopMonth(m){
+  mopSelMonth = m;
+  dayStage = 0;
+  buildMopMonthTabs();
+  renderVacContent();
+}
+
+function switchVac(v){
+  if(!hrVacs[v]) return;
+  hrVac = v;
+  document.querySelectorAll('#hrVacTabs .vac-btn').forEach(b=>b.classList.toggle('active', b.dataset.vac===v));
+  dayStage = 0;
+  // если у вакансии нет данных за выбранный месяц — прыгаем на последний доступный
+  if(!(VAC_DATA[v]||{})[mopSelMonth]){
+    const avail = mopMonthsList.filter(m=>(VAC_DATA[v]||{})[m]);
+    if(avail.length) mopSelMonth = avail[avail.length-1];
+  }
+  buildMopMonthTabs();
+  renderVacContent();
+}
+
+function renderVacContent(){
+  const meta = hrVacs[hrVac];
+  const d = (VAC_DATA[hrVac] || {})[mopSelMonth];
+  document.getElementById('hrVacTitle').textContent = meta.title;
+  document.getElementById('hrVacSub').textContent = mopSelMonth+' · воронка найма и активность рекрутеров';
+  document.getElementById('vac-mopy').style.display  = d ? '' : 'none';
+  document.getElementById('vac-empty').style.display = d ? 'none' : '';
+  if(d){ renderVacDash(d); }
+  else {
+    const name = meta.title.replace('Найм · ','');
+    const anyMonth = Object.keys(VAC_DATA[hrVac] || {}).length > 0;
+    document.getElementById('vacEmptyTitle').textContent = name;
+    document.getElementById('vacEmptyMsg').textContent = anyMonth
+      ? ('За «'+mopSelMonth+'» по вакансии «'+name+'» данных нет — месяц не заполнен. Месяцы со статистикой отмечены точкой.')
+      : ('По вакансии «'+name+'» в листе «КОпы» нет заполненных месяцев — воронка нулевая. Появятся цифры — сразу отобразим.');
+  }
+  saveNav();
+}
+
+function renderKopy(){
+  if(kopyDept==='hr'){ buildMopMonthTabs(); renderVacContent(); }
+  else { buildSalesMgrTabs(); buildSalesMonthTabs(); renderSalesContent(); }
+}
+
+// Единый рендер дашборда вакансии. d = {month:[...], weeks:[...], days:[...]}
+function _sabbr(s){ return s.length>14 ? s.slice(0,13)+'…' : s; }
+function renderVacDash(d){
+  const meta   = VAC_META[hrVac];
+  const stages = meta.stages;
+  const n      = stages.length;
+  const col    = STAGE_PAL[n] || STAGE_PAL[6];
+  const month  = d.month;
+  // индексы этапов с данными (не null)
+  const nn = month.map((v,i)=>v==null?-1:i).filter(i=>i>=0);
+  const top = month[nn[0]] || 1;
+  // CV между последовательными непустыми этапами
+  const cv = month.map(()=>null);
+  const cvPairs = [];
+  for(let k=1;k<nn.length;k++){ const i=nn[k], j=nn[k-1]; cv[i] = month[j] ? +(month[i]/month[j]*100).toFixed(1) : 0; cvPairs.push([j,i]); }
+
+  const COL = {blue:C.blue, purple:C.purple, orange:C.orange, green:C.green};
+  const BG = {
+    blue:  th('rgba(9,105,218,.22)','rgba(88,166,255,.32)'),
+    purple:th('rgba(130,80,223,.2)','rgba(188,140,255,.35)'),
+    orange:th('rgba(154,103,0,.2)','rgba(210,153,34,.4)'),
+    green: th('rgba(26,127,55,.28)','rgba(63,185,80,.45)')
+  };
+
+  // KPI: все этапы воронки; конверсия под цифрой — от этапа «Назначено»
+  let baseIdx = stages.findIndex(s=>s.startsWith('Назначено'));
+  if(baseIdx<0 || month[baseIdx]==null) baseIdx = nn[1]!=null?nn[1]:nn[0];
+  const baseVal = month[baseIdx] || 1;
+  const baseLabel = stages[baseIdx].startsWith('Назначено') ? 'от назначенных интервью' : ('от «'+stages[baseIdx].toLowerCase()+'»');
+  const kcls = ['blue','purple','green','orange','teal'];
+  const planSet = new Set(nn.slice(-4)); // последние 4 этапа — с полем плана
+  document.getElementById('vacKpiRow').innerHTML = nn.map((idx,j)=>{
+    const showPct = idx > baseIdx; // конверсии только после этапа «Назначено»
+    const pct = Math.round(month[idx]/baseVal*100);
+    const pcls = pct>=70?'exec-good':pct>=40?'exec-ok':'exec-bad';
+    let footer;
+    if(planSet.has(idx)){
+      footer = `${showPct?`<span class="kpi-exec ${pcls}">${pct}%</span>`:''}<span class="kpi-plan-wrap"><span class="kpi-plan-lbl">план</span><input class="kpi-plan-inp" type="number" min="0" value="${getPlan(idx)}" oninput="onKpiPlan(${idx},this)"></span>`;
+    } else if(showPct){
+      footer = `<span class="kpi-exec ${pcls}">${pct}%</span><span class="kpi-plan">${baseLabel}</span>`;
+    } else {
+      footer = `<span class="kpi-plan">&nbsp;</span>`;
+    }
+    return `<div class="kpi-card ${kcls[j%kcls.length]}">
+      <div class="kpi-label">${stages[idx]}</div>
+      <div class="kpi-value">${month[idx]}</div>
+      <div class="kpi-footer">${footer}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('vacFunnelTitle').textContent = 'Воронка найма — '+meta.name;
+  document.getElementById('vacFunnelSub').textContent = mopSelMonth+' · накопительно за месяц';
+
+  // Воронка — вид «Полосы» (пропускаем пустые этапы)
+  document.getElementById('mopFunnelWrap').innerHTML = stages.map((lbl,i)=> month[i]==null ? '' : `
+    <div class="f-item">
+      <div class="f-label">${lbl}</div>
+      <div class="f-bar-bg"><div class="f-bar" style="width:${Math.max(5,Math.round(month[i]/top*100))}%;background:${col[i]}">${month[i]}</div></div>
+      <div class="f-cv" style="color:${col[i]}">${cv[i]!=null?Math.round(cv[i])+'%':''}</div>
+    </div>`).join('');
+  // Воронка — вид «Воронка» (SVG-фигура)
+  document.getElementById('mopFunnelSvg').innerHTML = buildFunnelSvg(stages,col,month,cv,nn);
+  setFunnelView(funnelView);
+
+  // Активность по дням — столбцы по выбранному этапу воронки
+  curVacData = d;
+  if(!nn.includes(dayStage)) dayStage = nn[0];
+  renderDayChart();
+
+  // Таблица-детализация за месяц
+  renderVacTable(d, nn, cv);
+
+  // Спидометры «Выполнение плана»
+  renderGaugeGrid();
+  // Дашборд «Идём на» (прогноз vs план)
+  renderGoing();
+}
+
+// ===== СПИДОМЕТРЫ «Выполнение плана» (4 мини по этапам; план вводится в KPI) =====
+function gaugeColor(p){ return p>=100?'#1a7f37':p>=50?'#9a6700':'#cf222e'; }
+function _gPol(cx,cy,r,ang){ const a=(ang-90)*Math.PI/180; return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; }
+function _gArc(cx,cy,r,a0,a1){ const [sx,sy]=_gPol(cx,cy,r,a0), [ex,ey]=_gPol(cx,cy,r,a1); const lg=Math.abs(a1-a0)>180?1:0, sw=a1>a0?1:0; return `M ${sx.toFixed(1)} ${sy.toFixed(1)} A ${r} ${r} 0 ${lg} ${sw} ${ex.toFixed(1)} ${ey.toFixed(1)}`; }
+// этапы, по которым ставим план (последние до 4 непустых этапов воронки)
+function _planStages(){ const d=curVacData; if(!d) return []; const nn=d.month.map((v,i)=>v==null?-1:i).filter(i=>i>=0); return nn.slice(-4); }
+function _planKey(idx){ return 'gplan_'+hrVac+'_'+mopSelMonth+'_'+idx; }
+function getPlan(idx){ try{ const v=localStorage.getItem(_planKey(idx)); return v==null?'':v; }catch(e){ return ''; } }
+function onKpiPlan(idx, el){ try{ if(el.value==='') localStorage.removeItem(_planKey(idx)); else localStorage.setItem(_planKey(idx), el.value); }catch(e){} renderGaugeGrid(); renderGoing(); }
+// ===== ДАШБОРД «Идём на» (прогноз по темпу: факт × всего_дней / прошло_дней) =====
+function _workDays(year, mm, fromD, toD){ let c=0; for(let d=fromD; d<=toD; d++){ const dow=new Date(year,mm-1,d).getDay(); if(dow>=1&&dow<=5) c++; } return c; }
+function renderGoing(){
+  const wrap=document.getElementById('goingWrap'); if(!wrap) return;
+  const d=curVacData; if(!d){ wrap.innerHTML=''; return; }
+  const stages=VAC_META[hrVac].stages, month=d.month, txt=isDark?'#8b949e':'#57606a';
+  const [mName,yStr]=mopSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
+  const lastDay=new Date(year,mm,0).getDate();
+  const total=_workDays(year,mm,1,lastDay);
+  const now=new Date(), mStart=new Date(year,mm-1,1), mEnd=new Date(year,mm-1,lastDay,23,59,59);
+  let cutoff;
+  if(now>mEnd) cutoff=lastDay;        // месяц завершён — берём весь
+  else if(now<mStart) cutoff=0;       // месяц в будущем
+  else cutoff=now.getDate();          // текущий месяц — до сегодня
+  const elapsed = cutoff>0 ? _workDays(year,mm,1,cutoff) : 0;
+  const mult = elapsed>0 ? total/elapsed : 0;
+  const sub=document.getElementById('goingSub');
+  if(sub) sub.textContent = `прогноз на конец месяца · прошло ${elapsed} из ${total} раб. дней · план — пунктир`;
+  wrap.innerHTML = _planStages().map(i=>{
+    const plan=parseFloat(getPlan(i)), fact=month[i]||0;
+    const proj = elapsed>0 ? Math.round(fact*mult) : 0;
+    if(!(plan>0)) return `<div class="going-row"><div class="going-lbl">${stages[i]}</div><div class="going-bar"></div><div class="going-num" style="color:${txt}">— / —</div></div>`;
+    const frac=proj/plan, w=Math.max(2,Math.min(100,Math.round(frac*100)));
+    const col=frac>=1?'#2ea043':frac>=0.7?'#d4a017':'#e5534b';
+    return `<div class="going-row">
+      <div class="going-lbl">${stages[i]}</div>
+      <div class="going-bar" title="прогноз ${proj} из плана ${plan} (факт ${fact} за ${elapsed} дн.)"><div class="going-fill" style="width:${w}%;background:${col}"></div></div>
+      <div class="going-num"><b style="color:${col}">${proj}</b> <span style="color:${txt}">/ ${plan}</span></div>
+    </div>`;
+  }).join('');
+}
+function buildMiniGaugeSvg(pct, hasPlan){
+  const W=180,H=126,cx=90,cy=90,r=80,max=150,bw=17;
+  const ang=v=>-90+Math.max(0,Math.min(max,v))/max*180;
+  let s='';
+  s+=`<path d="${_gArc(cx,cy,r,ang(0),ang(50))}" fill="none" stroke="${isDark?'#f85149':'#e5534b'}" stroke-width="${bw}"/>`;
+  s+=`<path d="${_gArc(cx,cy,r,ang(50),ang(100))}" fill="none" stroke="${isDark?'#e3b341':'#d4a017'}" stroke-width="${bw}"/>`;
+  s+=`<path d="${_gArc(cx,cy,r,ang(100),ang(150))}" fill="none" stroke="${isDark?'#3fb950':'#2ea043'}" stroke-width="${bw}"/>`;
+  const col=hasPlan?gaugeColor(pct):(isDark?'#8b949e':'#8b98a5');
+  const [nx,ny]=_gPol(cx,cy,r-bw-2,ang(hasPlan?pct:0));
+  s+=`<line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${col}" stroke-width="4" stroke-linecap="round"/>`;
+  s+=`<circle cx="${cx}" cy="${cy}" r="7" fill="${col}"/><circle cx="${cx}" cy="${cy}" r="3" fill="#fff"/>`;
+  s+=`<text x="${cx}" y="${cy+32}" text-anchor="middle" font-size="22" font-weight="800" fill="${col}" font-family="'Segoe UI',sans-serif">${hasPlan?pct+'%':'—'}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:200px;display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
+function renderGaugeGrid(){
+  const grid=document.getElementById('gaugeGrid'); if(!grid) return;
+  const d=curVacData; if(!d){ grid.innerHTML=''; return; }
+  const stages=VAC_META[hrVac].stages, txt=isDark?'#8b949e':'#57606a';
+  grid.innerHTML = _planStages().map(idx=>{
+    const fact=d.month[idx]||0, plan=parseFloat(getPlan(idx)), hasPlan=plan>0, pct=hasPlan?Math.round(fact/plan*100):0;
+    return `<div class="chart-card" style="padding:10px 10px;display:flex;flex-direction:column;min-width:0">
+      <div class="chart-title" style="font-size:11.5px;line-height:1.15">${stages[idx]}</div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+        ${buildMiniGaugeSvg(pct,hasPlan)}
+        <div style="text-align:center;font-size:11px;color:${isDark?'#e6edf3':'#24292f'};margin-top:2px">факт ${fact} · план ${hasPlan?plan:'—'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===== SVG-ВОРОНКА =====
+let funnelView = 'funnel';
+function setFunnelView(v){
+  funnelView = v;
+  const b=document.getElementById('fv-bars'), f=document.getElementById('fv-funnel');
+  if(b) b.classList.toggle('active', v==='bars');
+  if(f) f.classList.toggle('active', v==='funnel');
+  const w=document.getElementById('mopFunnelWrap'), s=document.getElementById('mopFunnelSvg');
+  if(w) w.style.display = v==='bars' ? '' : 'none';
+  if(s) s.style.display = v==='funnel' ? '' : 'none';
+}
+function _shade(hex,amt){
+  let c=hex.replace('#',''); if(c.length===3) c=c.split('').map(x=>x+x).join('');
+  const r=parseInt(c.slice(0,2),16), g=parseInt(c.slice(2,4),16), b=parseInt(c.slice(4,6),16);
+  const f=x=>Math.max(0,Math.min(255,Math.round(x+amt)));
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+function _esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function buildFunnelSvg(stages,col,month,cv,nn){
+  const vals=nn.map(i=>month[i]), names=nn.map(i=>stages[i]), cols=nn.map(i=>col[i]), cvs=nn.map(i=>cv[i]);
+  const N=vals.length;
+  const W=360, maxW=322, minW=78, cx=W/2, segH=46, gap=26, padT=8, padB=8;
+  const H=padT+padB + N*segH + (N-1)*gap;
+  const maxV=Math.max(...vals,1);
+  const wOf=v=>minW+(v/maxV)*(maxW-minW);
+  const convColor=v=> v>=70?'#1a7f37' : v>=40?'#9a6700' : '#cf222e';
+  const bBg=isDark?'#1c2333':'#ffffff', bBd=isDark?'#30363d':'#d0d7de';
+  let defs='',shapes='',labels='',conv='';
+  let y=padT;
+  for(let k=0;k<N;k++){
+    const wTop=wOf(vals[k]);
+    const wBot=k<N-1 ? wOf(vals[k+1]) : Math.max(minW*0.66, wTop*0.6);
+    const yb=y+segH;
+    const x1=cx-wTop/2, x2=cx+wTop/2, x3=cx+wBot/2, x4=cx-wBot/2;
+    const c=cols[k], gid='fg'+k;
+    defs+=`<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${_shade(c,34)}"/><stop offset="1" stop-color="${_shade(c,-26)}"/></linearGradient>`;
+    shapes+=`<polygon points="${x1},${y} ${x2},${y} ${x3},${yb} ${x4},${yb}" fill="url(#${gid})" stroke="${_shade(c,-40)}" stroke-width="1" filter="url(#fsh)"/>`;
+    shapes+=`<polygon points="${x1},${y} ${x2},${y} ${x2-4},${y+3.5} ${x1+4},${y+3.5}" fill="rgba(255,255,255,.4)"/>`;
+    labels+=`<text x="${cx}" y="${y+18}" text-anchor="middle" font-size="9.5" font-weight="600" fill="rgba(255,255,255,.95)" font-family="'Segoe UI',sans-serif">${_esc(names[k].length>20?names[k].slice(0,19)+'…':names[k])}</text>`;
+    labels+=`<text x="${cx}" y="${y+37}" text-anchor="middle" font-size="18" font-weight="800" fill="#fff" font-family="'Segoe UI',sans-serif" style="paint-order:stroke;stroke:rgba(0,0,0,.22);stroke-width:2.5px">${vals[k]}</text>`;
+    if(k>0 && cvs[k]!=null){
+      const yc=y-gap/2, pct=Math.round(cvs[k])+'%', bw=pct.length*7.2+16, cc=convColor(cvs[k]);
+      conv+=`<path d="M ${cx} ${y-3} l -5 -6 l 10 0 z" fill="${cc}"/>`;
+      conv+=`<rect x="${cx-bw/2}" y="${yc-9}" rx="9" width="${bw}" height="18" fill="${bBg}" stroke="${bBd}" stroke-width="1"/>`;
+      conv+=`<text x="${cx}" y="${yc+4}" text-anchor="middle" font-size="11" font-weight="800" fill="${cc}" font-family="'Segoe UI',sans-serif">${pct}</text>`;
+    }
+    y=yb+gap;
+  }
+  const filt=`<filter id="fsh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2.4" flood-color="rgba(0,0,0,.20)"/></filter>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;max-width:440px;max-height:440px;margin:0 auto" xmlns="http://www.w3.org/2000/svg"><defs>${filt}${defs}</defs>${shapes}${conv}${labels}</svg>`;
+}
+
+// Табличная детализация за месяц: дни → «Неделя» → «Месяц» → «CV%»
+const _WD = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+const _MNUM = {'Январь':1,'Февраль':2,'Март':3,'Апрель':4,'Май':5,'Июнь':6,'Июль':7,'Август':8,'Сентябрь':9,'Октябрь':10,'Ноябрь':11,'Декабрь':12};
+function _isoWeek(year,mm,dd){
+  const dt=new Date(Date.UTC(year,mm-1,dd));
+  const day=dt.getUTCDay()||7; dt.setUTCDate(dt.getUTCDate()+4-day);
+  const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));
+  return dt.getUTCFullYear()*100 + Math.ceil((((dt-ys)/86400000)+1)/7);
+}
+function renderVacTable(d, nn, cv){
+  const meta=VAC_META[hrVac], stages=meta.stages, n=stages.length, month=d.month;
+  const [mName,yStr]=mopSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
+  const dim=new Date(year,mm,0).getDate();
+  // карта дней с данными
+  const dataMap={}; d.days.forEach(x=>{ dataMap[x.d]=x.s; });
+  // все будни месяца (+ любые дни, где вдруг есть данные) — пустые заполняем нулями
+  const dayset=new Set();
+  for(let dd=1;dd<=dim;dd++){ const dow=new Date(year,mm-1,dd).getDay(); if(dow>=1&&dow<=5) dayset.add(dd); }
+  d.days.forEach(x=>dayset.add(parseInt(x.d.split('.')[0],10)));
+  const allDays=[...dayset].sort((a,b)=>a-b).map(dd=>{
+    const key=String(dd).padStart(2,'0')+'.'+String(mm).padStart(2,'0');
+    return { dd, d:key, wd:_WD[new Date(year,mm-1,dd).getDay()], s: dataMap[key] || Array(n).fill(0) };
+  });
+  // группировка по ISO-неделе
+  const groups=[]; let cur=null,curKey=null;
+  allDays.forEach(x=>{
+    const k=_isoWeek(year,mm,x.dd);
+    if(k!==curKey){ cur={days:[],sum:Array(n).fill(0)}; groups.push(cur); curKey=k; }
+    cur.days.push(x); x.s.forEach((v,i)=>cur.sum[i]+=v);
+  });
+  // CV% для набора значений (между непустыми этапами месяца)
+  // CV% по всем этапам-переходам; где нет конверсии (деление на 0) — ставим 0%
+  const cvCells = vals => { const o=stages.map(()=>''); for(let k=1;k<nn.length;k++){const i=nn[k],j=nn[k-1]; o[i]=(vals[j]?Math.round(vals[i]/vals[j]*100):0)+'%';} return o.map(t=>`<td>${t}</td>`).join(''); };
+  const nums = arr => arr.map(v=>`<td>${v==null?'–':(v===0?'<span class="z">0</span>':v)}</td>`).join('');
+  const spacer = `<tr class="wsp"><td colspan="${n+1}"></td></tr>`;
+  let rows='';
+  groups.forEach(g=>{
+    g.days.forEach(x=>{ rows+=`<tr><td><span class="dow">${x.wd}</span>${x.d}</td>${nums(x.s)}</tr>`; });
+    rows+=`<tr class="wk"><td>Неделя</td>${nums(g.sum)}</tr>`;
+    rows+=`<tr class="cv cvw"><td>CV%</td>${cvCells(g.sum)}</tr>`;
+    rows+=spacer;
+  });
+  rows+=`<tr class="mo"><td>Месяц</td>${nums(month)}</tr>`;
+  rows+=`<tr class="cv"><td>CV%</td>${cvCells(month)}</tr>`;
+  const head=`<tr><th>Дата</th>${stages.map(s=>`<th>${s}</th>`).join('')}</tr>`;
+  document.getElementById('vacTableWrap').innerHTML=`<table class="vt"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+  document.getElementById('vacTableSub').textContent = meta.name+' · '+mopSelMonth;
+}
+
+// Дневной столбчатый график для выбранного этапа (dayStage)
+let curVacData = null;
+let dayStage = 0;
+function setDayStage(i){ dayStage = i; renderDayChart(); }
+
+function renderDayChart(){
+  const d = curVacData; if(!d) return;
+  const meta = VAC_META[hrVac], stages = meta.stages, n = stages.length;
+  const col = STAGE_PAL[n] || STAGE_PAL[6];
+  const month = d.month;
+  const nn = month.map((v,i)=>v==null?-1:i).filter(i=>i>=0);
+  if(!nn.includes(dayStage)) dayStage = nn[0];
+  const c = col[dayStage];
+
+  // Переключатели этапов (только непустые)
+  document.getElementById('vacDayTabs').innerHTML = stages.map((s,i)=> month[i]==null ? '' :
+    `<button class="stage-btn${i===dayStage?' active':''}" style="${i===dayStage?('background:'+c+';border-color:'+c+';color:#fff'):''}" onclick="setDayStage(${i})">${s}</button>`).join('');
+  document.getElementById('vacDaySub').textContent = 'по дням · '+stages[dayStage];
+
+  // только будни месяца с днями недели; пустые = 0 (выходные не показываем)
+  const [mName,yStr]=mopSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
+  const dim=new Date(year,mm,0).getDate();
+  const dmap={}; d.days.forEach(x=>{ dmap[x.d]=x.s; });
+  const labels=[], data=[], bg=[], bd=[];
+  for(let dd=1;dd<=dim;dd++){
+    const dow=new Date(year,mm-1,dd).getDay();
+    if(dow===0||dow===6) continue;
+    const key=String(dd).padStart(2,'0')+'.'+String(mm).padStart(2,'0');
+    labels.push([String(dd).padStart(2,'0'), _WD[dow]]);
+    data.push((dmap[key]?dmap[key][dayStage]:0)||0);
+    bg.push(c+'cc'); bd.push(c);
+  }
+
+  killChart('mopDay');
+  const o = baseOpts('bar');
+  o.plugins.tooltip.callbacks.label = ctx=>' '+stages[dayStage]+': '+ctx.raw;
+  o.plugins.tooltip.callbacks.title = items=>Array.isArray(items[0].label)?items[0].label.join(' '):items[0].label;
+  o.layout = {padding:{top:18}};
+  o.scales.x.ticks.autoSkip=false; o.scales.x.ticks.maxRotation=0; o.scales.x.ticks.minRotation=0; o.scales.x.ticks.font={size:9};
+  charts['mopDay'] = new Chart(document.getElementById('mopDayChart'),{
+    type:'bar',
+    data:{labels,datasets:[{label:stages[dayStage],data,backgroundColor:bg,borderColor:bd,borderWidth:1.5,borderRadius:4}]},
+    options:o,
+    plugins:[barLabelPlugin({datasets:'all',fontSize:9,formatter:v=>v||'',color:c})]
+  });
+}
+
+// ===================================================================
+// ===== ОТДЕЛ ПРОДАЖ · КОПы (по аналогии с наймом) =====
+// ===================================================================
+// Этапы воронки продаж (s = [Звонки, КП, Дожимы, Назначено, Проведено, Договоры, Новые клиенты])
+const SALES_STAGES = ['Звонки','КП','Дожимы','Назначено встреч','Проведено встреч','Договоры','Новые клиенты'];
+// Менеджеры: сначала сотрудники, последним — «по всем менеджерам»
+const SALES_MGRS = [
+  {key:'sizova',   name:'Сизова Ирина'},
+  {key:'kolosova', name:'Колосова Дарья'},
+  {key:'all',      name:'По всем менеджерам'},
+];
+const SALES_MGR_ORDER = SALES_MGRS.map(m=>m.key);
+
+// Данные: manager → «Месяц Год» → { month:[7], plan:[7|null], money:{oplaty,pribyl,premiya,oplatyP,pribylP,premiyaP}, days:[{d,s:[7]}] }
+const SALES_DATA = {
+  sizova:{
+    'Июль 2026':{
+      month:[183,15,9,1,1,1,0],
+      plan:[850,55,null,null,22,11,null],
+      money:{oplaty:372932,oplatyP:6000000,pribyl:149173,pribylP:2400000,premiya:29835,premiyaP:480000},
+      days:[
+        {d:'01.07',s:[66,5,4,1,0,0,0]},
+        {d:'02.07',s:[61,5,3,0,1,1,0]},
+        {d:'03.07',s:[56,5,2,0,0,0,0]},
+      ]
+    }
+  },
+  kolosova:{
+    'Июль 2026':{
+      month:[211,6,2,0,0,0,0],
+      plan:[1610,99,null,null,null,null,null],
+      money:{oplaty:0,oplatyP:6000000,pribyl:0,pribylP:2400000,premiya:0,premiyaP:480000},
+      days:[
+        {d:'01.07',s:[66,0,0,0,0,0,0]},
+        {d:'02.07',s:[75,4,2,0,0,0,0]},
+        {d:'03.07',s:[70,2,0,0,0,0,0]},
+      ]
+    }
+  },
+  all:{
+    'Июль 2026':{
+      month:[394,21,11,1,1,1,0],
+      plan:[3500,217,null,30,20,5,5],
+      money:{oplaty:372932,oplatyP:6000000,pribyl:130526,pribylP:2400000,premiya:26105,premiyaP:480000},
+      days:[
+        {d:'01.07',s:[132,5,4,1,0,0,0]},
+        {d:'02.07',s:[136,9,5,0,1,1,0]},
+        {d:'03.07',s:[126,7,2,0,0,0,0]},
+      ]
+    },
+    'Июнь 2026':{
+      month:[955,72,41,4,4,3,1],
+      plan:[3000,170,null,34,23,11,5],
+      money:{oplaty:354217,oplatyP:6000000,pribyl:123976,pribylP:2400000,premiya:24795,premiyaP:480000},
+      days:[
+        {d:'09.06',s:[36,2,5,0,0,0,0]},
+        {d:'10.06',s:[36,3,4,1,1,0,0]},
+        {d:'16.06',s:[137,10,4,1,1,1,0]},
+        {d:'17.06',s:[127,9,9,0,0,0,0]},
+        {d:'18.06',s:[178,11,2,1,1,1,1]},
+        {d:'19.06',s:[146,8,0,0,0,0,0]},
+        {d:'22.06',s:[66,4,0,1,1,0,0]},
+        {d:'25.06',s:[108,11,9,0,0,0,0]},
+        {d:'26.06',s:[121,14,8,0,0,1,0]},
+      ]
+    }
+  },
+};
+
+// Список месяцев для переключателя (как в найме)
+const salesMonthsList = [
+  'Январь 2026','Февраль 2026','Март 2026','Апрель 2026','Май 2026',
+  'Июнь 2026','Июль 2026','Август 2026'
+];
+let slMgr = 'sizova';
+let slSelMonth = 'Июль 2026';
+let slDayStage = 0;
+let slFunnelView = 'funnel';
+let curSalesData = null;
+
+function salesMonthsSet(mgr){ return new Set(Object.keys(SALES_DATA[mgr]||{})); }
+
+function buildSalesMgrTabs(){
+  const row=document.getElementById('slMgrTabs'); if(!row) return;
+  row.innerHTML = SALES_MGRS.map(m=>
+    `<button class="vac-btn${m.key===slMgr?' active':''}" data-mgr="${m.key}" onclick="switchSalesMgr('${m.key}')">${m.name}</button>`
+  ).join('');
+}
+function buildSalesMonthTabs(){
+  const row=document.getElementById('slMonthTabs'); if(!row) return;
+  const has=salesMonthsSet(slMgr);
+  const rev=[...salesMonthsList].reverse();
+  row.innerHTML = rev.map(m=>{
+    const act=m===slSelMonth?' active':'';
+    const dot=has.has(m)?'<span class="mf-dot"></span>':'';
+    const style=has.has(m)?'':'opacity:.5';
+    return `<div class="month-tab${act}" style="${style}" onclick="selectSalesMonth('${m}')">${_mshort(m)}${dot}</div>`;
+  }).join('');
+}
+function selectSalesMonth(m){ slSelMonth=m; slDayStage=0; buildSalesMonthTabs(); renderSalesContent(); }
+function switchSalesMgr(k){
+  if(!SALES_DATA[k]) return;
+  slMgr=k; slDayStage=0;
+  document.querySelectorAll('#slMgrTabs .vac-btn').forEach(b=>b.classList.toggle('active', b.dataset.mgr===k));
+  if(!(SALES_DATA[k]||{})[slSelMonth]){
+    const avail=salesMonthsList.filter(m=>(SALES_DATA[k]||{})[m]);
+    if(avail.length) slSelMonth=avail[avail.length-1];
+  }
+  buildSalesMonthTabs(); renderSalesContent();
+}
+function mgrName(k){ const m=SALES_MGRS.find(x=>x.key===k); return m?m.name:k; }
+
+function renderSalesContent(){
+  const d=(SALES_DATA[slMgr]||{})[slSelMonth];
+  document.getElementById('slTitle').textContent='Отдел продаж · '+mgrName(slMgr);
+  document.getElementById('slSub').textContent=slSelMonth+' · воронка продаж и активность менеджеров';
+  document.getElementById('sl-main').style.display  = d ? '' : 'none';
+  document.getElementById('sl-empty').style.display = d ? 'none' : '';
+  if(d){ renderSalesDash(d); }
+  else {
+    const anyMonth=Object.keys(SALES_DATA[slMgr]||{}).length>0;
+    document.getElementById('slEmptyTitle').textContent=mgrName(slMgr);
+    document.getElementById('slEmptyMsg').textContent = anyMonth
+      ? ('За «'+slSelMonth+'» по менеджеру «'+mgrName(slMgr)+'» данных нет. Месяцы со статистикой отмечены точкой.')
+      : ('По менеджеру «'+mgrName(slMgr)+'» пока нет заполненных месяцев.');
+  }
+  saveNav();
+}
+
+// planы спидометров: localStorage → иначе значение из листа (month.plan)
+function _slPlanKey(idx){ return 'splan_'+slMgr+'_'+slSelMonth+'_'+idx; }
+function getSalesPlan(idx){
+  try{ const v=localStorage.getItem(_slPlanKey(idx)); if(v!=null&&v!=='') return v; }catch(e){}
+  const d=curSalesData; if(d&&d.plan&&d.plan[idx]!=null) return String(d.plan[idx]);
+  return '';
+}
+function onSalesPlan(idx,el){ try{ if(el.value==='') localStorage.removeItem(_slPlanKey(idx)); else localStorage.setItem(_slPlanKey(idx), el.value); }catch(e){} renderSalesGaugeGrid(); renderSalesGoing(); }
+// последние 4 непустых этапа — с планом (как в найме)
+function _salesPlanStages(){ const d=curSalesData; if(!d) return []; const nn=d.month.map((v,i)=>v==null?-1:i).filter(i=>i>=0); return nn.slice(-4); }
+
+function renderSalesDash(d){
+  curSalesData=d;
+  const stages=SALES_STAGES, n=stages.length, col=STAGE_PAL[n]||STAGE_PAL[6];
+  const month=d.month;
+  const nn=month.map((v,i)=>v==null?-1:i).filter(i=>i>=0);
+  const top=month[nn[0]]||1;
+  // CV между последовательными непустыми этапами
+  const cv=month.map(()=>null);
+  for(let k=1;k<nn.length;k++){ const i=nn[k], j=nn[k-1]; cv[i]=month[j]?+(month[i]/month[j]*100).toFixed(1):0; }
+
+  // ---- Деньги ----
+  const mo=d.money||{};
+  const moneyCards=[
+    {lbl:'Оплаты (выручка)',v:mo.oplaty,p:mo.oplatyP,cls:'green'},
+    {lbl:'Прибыль',         v:mo.pribyl,p:mo.pribylP,cls:'blue'},
+    {lbl:'Премия менеджера',v:mo.premiya,p:mo.premiyaP,cls:'purple'},
+  ];
+  document.getElementById('slMoneyRow').innerHTML = moneyCards.map(c=>{
+    const pct=c.p?Math.round((c.v||0)/c.p*100):null;
+    const pcls=pct==null?'':(pct>=70?'exec-good':pct>=40?'exec-ok':'exec-bad');
+    return `<div class="kpi-card ${c.cls}">
+      <div class="kpi-label">${c.lbl}</div>
+      <div class="kpi-value" style="font-size:20px">${fmt(c.v||0)}</div>
+      <div class="kpi-footer">${pct!=null?`<span class="kpi-exec ${pcls}">${pct}%</span>`:''}<span class="kpi-plan">план ${fmt(c.p||0)}</span></div>
+    </div>`;
+  }).join('');
+
+  // ---- KPI по этапам воронки ----
+  const baseIdx=3; // «Назначено встреч» — база конверсий
+  const baseVal=month[baseIdx]||1;
+  const kcls=['blue','purple','green','orange','teal','blue','green'];
+  const planSet=new Set(nn.slice(-4));
+  document.getElementById('slKpiRow').innerHTML = nn.map((idx,j)=>{
+    const showPct=idx>baseIdx;
+    const pct=Math.round(month[idx]/baseVal*100);
+    const pcls=pct>=70?'exec-good':pct>=40?'exec-ok':'exec-bad';
+    let footer;
+    if(planSet.has(idx)){
+      footer=`${showPct?`<span class="kpi-exec ${pcls}">${pct}%</span>`:''}<span class="kpi-plan-wrap"><span class="kpi-plan-lbl">план</span><input class="kpi-plan-inp" type="number" min="0" value="${getSalesPlan(idx)}" oninput="onSalesPlan(${idx},this)"></span>`;
+    } else if(showPct){
+      footer=`<span class="kpi-exec ${pcls}">${pct}%</span><span class="kpi-plan">от назначенных</span>`;
+    } else {
+      footer=`<span class="kpi-plan">&nbsp;</span>`;
+    }
+    return `<div class="kpi-card ${kcls[j%kcls.length]}">
+      <div class="kpi-label">${stages[idx]}</div>
+      <div class="kpi-value">${month[idx]}</div>
+      <div class="kpi-footer">${footer}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('slFunnelTitle').textContent='Воронка продаж — '+mgrName(slMgr);
+  document.getElementById('slFunnelSub').textContent=slSelMonth+' · накопительно за месяц';
+  // Полосы
+  document.getElementById('slFunnelWrap').innerHTML = stages.map((lbl,i)=> month[i]==null?'':`
+    <div class="f-item">
+      <div class="f-label">${lbl}</div>
+      <div class="f-bar-bg"><div class="f-bar" style="width:${Math.max(5,Math.round(month[i]/top*100))}%;background:${col[i]}">${month[i]}</div></div>
+      <div class="f-cv" style="color:${col[i]}">${cv[i]!=null?Math.round(cv[i])+'%':''}</div>
+    </div>`).join('');
+  // SVG-воронка (используем общий строитель)
+  document.getElementById('slFunnelSvg').innerHTML = buildFunnelSvg(stages,col,month,cv,nn);
+  setSalesFunnelView(slFunnelView);
+
+  // Активность по дням
+  if(!nn.includes(slDayStage)) slDayStage=nn[0];
+  renderSalesDayChart();
+  // Таблица
+  renderSalesTable(d,nn,cv);
+  // Спидометры
+  renderSalesGaugeGrid();
+  // «Идём на»
+  renderSalesGoing();
+}
+
+function setSalesFunnelView(v){
+  slFunnelView=v;
+  const b=document.getElementById('slfv-bars'), f=document.getElementById('slfv-funnel');
+  if(b) b.classList.toggle('active', v==='bars');
+  if(f) f.classList.toggle('active', v==='funnel');
+  const w=document.getElementById('slFunnelWrap'), s=document.getElementById('slFunnelSvg');
+  if(w) w.style.display = v==='bars'?'':'none';
+  if(s) s.style.display = v==='funnel'?'':'none';
+}
+
+function renderSalesGaugeGrid(){
+  const grid=document.getElementById('slGaugeGrid'); if(!grid) return;
+  const d=curSalesData; if(!d){ grid.innerHTML=''; return; }
+  grid.innerHTML = _salesPlanStages().map(idx=>{
+    const fact=d.month[idx]||0, plan=parseFloat(getSalesPlan(idx)), hasPlan=plan>0, pct=hasPlan?Math.round(fact/plan*100):0;
+    return `<div class="chart-card" style="padding:10px 10px;display:flex;flex-direction:column;min-width:0">
+      <div class="chart-title" style="font-size:11.5px;line-height:1.15">${SALES_STAGES[idx]}</div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+        ${buildMiniGaugeSvg(pct,hasPlan)}
+        <div style="text-align:center;font-size:11px;color:${isDark?'#e6edf3':'#24292f'};margin-top:2px">факт ${fact} · план ${hasPlan?plan:'—'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSalesGoing(){
+  const wrap=document.getElementById('slGoingWrap'); if(!wrap) return;
+  const d=curSalesData; if(!d){ wrap.innerHTML=''; return; }
+  const stages=SALES_STAGES, month=d.month, txt=isDark?'#8b949e':'#57606a';
+  const [mName,yStr]=slSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
+  const lastDay=new Date(year,mm,0).getDate();
+  const total=_workDays(year,mm,1,lastDay);
+  const now=new Date(), mStart=new Date(year,mm-1,1), mEnd=new Date(year,mm-1,lastDay,23,59,59);
+  let cutoff;
+  if(now>mEnd) cutoff=lastDay; else if(now<mStart) cutoff=0; else cutoff=now.getDate();
+  const elapsed=cutoff>0?_workDays(year,mm,1,cutoff):0;
+  const mult=elapsed>0?total/elapsed:0;
+  const sub=document.getElementById('slGoingSub');
+  if(sub) sub.textContent=`прогноз на конец месяца · прошло ${elapsed} из ${total} раб. дней · план — пунктир`;
+  wrap.innerHTML = _salesPlanStages().map(i=>{
+    const plan=parseFloat(getSalesPlan(i)), fact=month[i]||0;
+    const proj=elapsed>0?Math.round(fact*mult):0;
+    if(!(plan>0)) return `<div class="going-row"><div class="going-lbl">${stages[i]}</div><div class="going-bar"></div><div class="going-num" style="color:${txt}">— / —</div></div>`;
+    const frac=proj/plan, w=Math.max(2,Math.min(100,Math.round(frac*100)));
+    const cc=frac>=1?'#2ea043':frac>=0.7?'#d4a017':'#e5534b';
+    return `<div class="going-row">
+      <div class="going-lbl">${stages[i]}</div>
+      <div class="going-bar" title="прогноз ${proj} из плана ${plan} (факт ${fact} за ${elapsed} дн.)"><div class="going-fill" style="width:${w}%;background:${cc}"></div></div>
+      <div class="going-num"><b style="color:${cc}">${proj}</b> <span style="color:${txt}">/ ${plan}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function renderSalesTable(d, nn, cv){
+  const stages=SALES_STAGES, n=stages.length, month=d.month;
+  const [mName,yStr]=slSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
+  const dim=new Date(year,mm,0).getDate();
+  const dataMap={}; d.days.forEach(x=>{ dataMap[x.d]=x.s; });
+  const dayset=new Set();
+  for(let dd=1;dd<=dim;dd++){ const dow=new Date(year,mm-1,dd).getDay(); if(dow>=1&&dow<=5) dayset.add(dd); }
+  d.days.forEach(x=>dayset.add(parseInt(x.d.split('.')[0],10)));
+  const allDays=[...dayset].sort((a,b)=>a-b).map(dd=>{
+    const key=String(dd).padStart(2,'0')+'.'+String(mm).padStart(2,'0');
+    return { dd, d:key, wd:_WD[new Date(year,mm-1,dd).getDay()], s: dataMap[key] || Array(n).fill(0) };
+  });
+  const groups=[]; let cur=null,curKey=null;
+  allDays.forEach(x=>{
+    const k=_isoWeek(year,mm,x.dd);
+    if(k!==curKey){ cur={days:[],sum:Array(n).fill(0)}; groups.push(cur); curKey=k; }
+    cur.days.push(x); x.s.forEach((v,i)=>cur.sum[i]+=v);
+  });
+  const cvCells=vals=>{ const o=stages.map(()=>''); for(let k=1;k<nn.length;k++){const i=nn[k],j=nn[k-1]; o[i]=(vals[j]?Math.round(vals[i]/vals[j]*100):0)+'%';} return o.map(t=>`<td>${t}</td>`).join(''); };
+  const nums=arr=>arr.map(v=>`<td>${v==null?'–':(v===0?'<span class="z">0</span>':v)}</td>`).join('');
+  const spacer=`<tr class="wsp"><td colspan="${n+1}"></td></tr>`;
+  let rows='';
+  groups.forEach(g=>{
+    g.days.forEach(x=>{ rows+=`<tr><td><span class="dow">${x.wd}</span>${x.d}</td>${nums(x.s)}</tr>`; });
+    rows+=`<tr class="wk"><td>Неделя</td>${nums(g.sum)}</tr>`;
+    rows+=`<tr class="cv cvw"><td>CV%</td>${cvCells(g.sum)}</tr>`;
+    rows+=spacer;
+  });
+  rows+=`<tr class="mo"><td>Месяц</td>${nums(month)}</tr>`;
+  rows+=`<tr class="cv"><td>CV%</td>${cvCells(month)}</tr>`;
+  const head=`<tr><th>Дата</th>${stages.map(s=>`<th>${s}</th>`).join('')}</tr>`;
+  document.getElementById('slTableWrap').innerHTML=`<table class="vt"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+  document.getElementById('slTableSub').textContent=mgrName(slMgr)+' · '+slSelMonth;
+}
+
+function setSalesDayStage(i){ slDayStage=i; renderSalesDayChart(); }
+function renderSalesDayChart(){
+  const d=curSalesData; if(!d) return;
+  const stages=SALES_STAGES, n=stages.length, col=STAGE_PAL[n]||STAGE_PAL[6], month=d.month;
+  const nn=month.map((v,i)=>v==null?-1:i).filter(i=>i>=0);
+  if(!nn.includes(slDayStage)) slDayStage=nn[0];
+  const c=col[slDayStage];
+  document.getElementById('slDayTabs').innerHTML = stages.map((s,i)=> month[i]==null?'':
+    `<button class="stage-btn${i===slDayStage?' active':''}" style="${i===slDayStage?('background:'+c+';border-color:'+c+';color:#fff'):''}" onclick="setSalesDayStage(${i})">${s}</button>`).join('');
+  document.getElementById('slDaySub').textContent='по дням · '+stages[slDayStage];
+  const [mName,yStr]=slSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
+  const dim=new Date(year,mm,0).getDate();
+  const dmap={}; d.days.forEach(x=>{ dmap[x.d]=x.s; });
+  const labels=[], data=[], bg=[], bd=[];
+  for(let dd=1;dd<=dim;dd++){
+    const dow=new Date(year,mm-1,dd).getDay();
+    if(dow===0||dow===6) continue;
+    const key=String(dd).padStart(2,'0')+'.'+String(mm).padStart(2,'0');
+    labels.push([String(dd).padStart(2,'0'), _WD[dow]]);
+    data.push((dmap[key]?dmap[key][slDayStage]:0)||0);
+    bg.push(c+'cc'); bd.push(c);
+  }
+  killChart('slDay');
+  const o=baseOpts('bar');
+  o.plugins.tooltip.callbacks.label=ctx=>' '+stages[slDayStage]+': '+ctx.raw;
+  o.plugins.tooltip.callbacks.title=items=>Array.isArray(items[0].label)?items[0].label.join(' '):items[0].label;
+  o.layout={padding:{top:18}};
+  o.scales.x.ticks.autoSkip=false; o.scales.x.ticks.maxRotation=0; o.scales.x.ticks.minRotation=0; o.scales.x.ticks.font={size:9};
+  charts['slDay']=new Chart(document.getElementById('slDayChart'),{
+    type:'bar',
+    data:{labels,datasets:[{label:stages[slDayStage],data,backgroundColor:bg,borderColor:bd,borderWidth:1.5,borderRadius:4}]},
+    options:o,
+    plugins:[barLabelPlugin({datasets:'all',fontSize:9,formatter:v=>v||'',color:c})]
+  });
+}
+
+// Метка актуальности данных рядом с «Live»
+function updateActualLabel(){
+  const el=document.getElementById('actualLabel'); if(!el) return;
+  const WD=['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+  const MN=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const n=new Date();
+  const p=x=>String(x).padStart(2,'0');
+  el.textContent=`Актуально на: ${WD[n.getDay()]} ${p(n.getDate())} ${MN[n.getMonth()]} ${n.getFullYear()} в ${p(n.getHours())}:${p(n.getMinutes())}`;
+}
+
+// ===== DEPT SWITCHING =====
+function switchDept(id){
+  document.querySelectorAll('.dept-tab').forEach(t=>t.classList.toggle('active', t.dataset.dept===id));
+  document.querySelectorAll('.dept-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('dept-'+id).classList.add('active');
+
+  if(id==='glavnye') renderGlavnye();
+  if(id==='kopy') renderKopy();
+  saveNav();
+}
+// запоминание/восстановление последней просмотренной вкладки
+function saveNav(){ try{
+  const at=document.querySelector('.dept-tab.active');
+  localStorage.setItem('nav_dept', at?at.dataset.dept:'glavnye');
+  localStorage.setItem('nav_kdept', kopyDept);
+  localStorage.setItem('nav_vac', hrVac);
+  localStorage.setItem('nav_month', mopSelMonth);
+  localStorage.setItem('nav_slmgr', slMgr);
+  localStorage.setItem('nav_slmonth', slSelMonth);
+}catch(e){} }
+function restoreNav(){
+  let dept='glavnye';
+  try{
+    const m=localStorage.getItem('nav_month'); if(m && mopMonthsList.includes(m)) mopSelMonth=m;
+    const v=localStorage.getItem('nav_vac'); if(v && hrVacs[v]) hrVac=v;
+    const kd=localStorage.getItem('nav_kdept'); if(kd==='hr'||kd==='prodazhi') kopyDept=kd;
+    const dd=localStorage.getItem('nav_dept'); if(dd==='glavnye'||dd==='kopy') dept=dd;
+    const sm=localStorage.getItem('nav_slmgr'); if(sm && SALES_DATA[sm]) slMgr=sm;
+    const smo=localStorage.getItem('nav_slmonth'); if(smo && salesMonthsList.includes(smo)) slSelMonth=smo;
+  }catch(e){}
+  buildSalesMgrTabs();
+  document.querySelectorAll('#kopyDeptTabs .month-tab').forEach(t=>t.classList.toggle('active', t.dataset.kdept===kopyDept));
+  const kh=document.getElementById('kopy-hr'), kp=document.getElementById('kopy-prodazhi');
+  if(kh) kh.style.display = kopyDept==='hr'?'':'none';
+  if(kp) kp.style.display = kopyDept==='prodazhi'?'':'none';
+  document.querySelectorAll('#hrVacTabs .vac-btn').forEach(b=>b.classList.toggle('active', b.dataset.vac===hrVac));
+  switchDept(dept);
+}
+
+// Доска «Главные цифры»: Склад (последний месяц) + Отдел продаж
+function renderGlavnye(){
+  renderMonth(months[months.length - 1]);
+  renderAllMonthsChart();
+  renderSales();
+}
+
+// ===== THEME =====
+function renderCurrentView(){
+  // Destroy all charts so next render picks up new theme colors
+  Object.keys(charts).forEach(k=>killChart(k));
+  const activeSection = document.querySelector('.dept-section.active');
+  if(!activeSection) return;
+  const id = activeSection.id.replace('dept-','');
+  if(id==='glavnye'){ renderGlavnye(); }
+  else if(id==='kopy'){ renderKopy(); }
+}
+
+function applyTheme(dark){
+  isDark = dark;
+  Object.assign(C, isDark ? THEMES.dark : THEMES.light);
+  document.body.classList.toggle('dark', dark);
+  const btn = document.getElementById('themeToggle');
+  if(btn) btn.textContent = dark ? '☀️' : '🌙';
+  renderCurrentView();
+}
+
+function toggleTheme(){
+  applyTheme(!isDark);
+}
+
+// ===== LIVE DATA (Google Sheets) =====
+const SHEET_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkhk_qMauh_cqJNCWEvjMFikvWXs0TQL_05qOovBUBYGykd20j8jyzH9pwIXVttuTEwDVkWn-eDcdO/pub?gid=881121812&single=true&output=csv';
+
+function _csv(text) {
+  const rows = [];
+  for (const line of text.replace(/\r/g,'').split('\n')) {
+    const row = []; let inQ = false, f = '';
+    for (const c of line) {
+      if (c === '"') inQ = !inQ;
+      else if (c === ',' && !inQ) { row.push(f.trim()); f = ''; }
+      else f += c;
+    }
+    row.push(f.trim()); rows.push(row);
+  }
+  return rows;
+}
+
+// Parse money: "р.4 650 925" or "4650925" or "р.-7 583"
+function _rub(s) {
+  if (!s) return null;
+  const m = s.replace(/−/g,'-').match(/-?[\d][\d\s]*/);
+  if (!m) return null;
+  const n = parseInt(m[0].replace(/\s/g,''));
+  return isNaN(n) ? null : n;
+}
+
+// Parse percent: "70%" or "0.7" or "0,7"
+function _pct(s) {
+  if (!s) return null;
+  s = s.trim();
+  if (s.endsWith('%')) { const n=parseFloat(s.replace('%','')); return isNaN(n)?null:Math.round(n); }
+  const n = parseFloat(s.replace(',','.'));
+  if (isNaN(n)) return null;
+  return (n>0 && n<=1) ? Math.round(n*100) : Math.round(n);
+}
+
+// Parse units: "115 470 шт." or "115470"
+function _units(s) {
+  if (!s) return null;
+  const n = parseInt(s.replace(/[^\d]/g,''));
+  return isNaN(n)||n===0 ? null : n;
+}
+
+const _MP = {
+  'январ':['Янв',1],'феврал':['Фев',2],'март':['Мар',3],'апрел':['Апр',4],
+  'май':['Май',5],'июн':['Июн',6],'июл':['Июл',7],'август':['Авг',8],
+  'сентябр':['Сен',9],'октябр':['Окт',10],'ноябр':['Ноя',11],'декабр':['Дек',12]
+};
+const _MM = {
+  'января':1,'февраля':2,'марта':3,'апреля':4,'мая':5,'июня':6,
+  'июля':7,'августа':8,'сентября':9,'октября':10,'ноября':11,'декабря':12
+};
+const _DAYS = new Set(['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС']);
+
+function _minfo(s) {
+  const lo = s.toLowerCase();
+  for (const [k,v] of Object.entries(_MP)) if (lo.startsWith(k)) return v;
+  return null;
+}
+
+function _fmtDate(s) {
+  const p = s.trim().split(' ');
+  if (p.length>=2) { const d=parseInt(p[0]),m=_MM[p[1].toLowerCase()]; if(m) return String(d).padStart(2,'0')+'.'+String(m).padStart(2,'0'); }
+  return s;
+}
+
+async function fetchLiveData() {
+  const resp = await fetch(SHEET_CSV);
+  if (!resp.ok) throw new Error('HTTP '+resp.status);
+  const rows = _csv(await resp.text());
+  const live = []; const seen = new Set(); let cur = null, mi = -1;
+  for (const r of rows) {
+    const c0=(r[0]||'').trim(), c1=(r[1]||'').trim();
+    const mk = _minfo(c0);
+    const yr = c0.match(/(\d{4})/);
+    if (mk && yr && (r[6]||r[7]) && !seen.has(c0)) {
+      seen.add(c0); mi++;
+      cur = {
+        name: mk[0]+"'"+(yr[1].slice(2)), full: c0,
+        revenueP:_rub(r[6]), revenueF:_rub(r[7]),
+        marginP:_rub(r[10]),  marginF:_rub(r[11]),
+        rentaP:_pct(r[3]),    rentaF:_pct(r[4]),
+        unitsP:_units(r[13]), unitsF:_units(r[14]),
+        weeks:[], days:[]
+      };
+      live.push(cur);
+    } else if (c1==='Неделя' && cur) {
+      cur.weeks.push({n:'Нед.'+c0, rP:_rub(r[6]), rF:_rub(r[7]), ex:_pct(r[8]), mi});
+    } else if (_DAYS.has(c0) && cur && c1) {
+      const rF=_rub(r[7]);
+      if (rF&&rF>0) cur.days.push({d:_fmtDate(c1), rP:_rub(r[6]), rF, rt:_pct(r[4])});
+    }
+  }
+  return live;
+}
+
+// ===== DRAG & DROP: перестановка вкладок/разделов мышкой =====
+function _dndAfter(container, sel, dragEl, x){
+  const els=[...container.querySelectorAll(sel)].filter(e=>e!==dragEl);
+  let best={o:-Infinity, el:null};
+  els.forEach(el=>{ const b=el.getBoundingClientRect(); const o=x-b.left-b.width/2; if(o<0 && o>best.o) best={o, el}; });
+  return best.el;
+}
+function _dndSave(container, sel, key){
+  try{ localStorage.setItem('ord_'+key, JSON.stringify([...container.querySelectorAll(sel)].map(e=>e.textContent.trim()))); }catch(e){}
+}
+function _dndRestore(container, sel, key){
+  try{
+    const saved=JSON.parse(localStorage.getItem('ord_'+key)||'null'); if(!saved) return;
+    const map={}; container.querySelectorAll(sel).forEach(e=>map[e.textContent.trim()]=e);
+    saved.forEach(t=>{ if(map[t]) container.appendChild(map[t]); });
+  }catch(e){}
+}
+function makeSortable(container, sel, key){
+  if(!container) return;
+  _dndRestore(container, sel, key);
+  let dragEl=null;
+  container.querySelectorAll(sel).forEach(it=>{
+    it.setAttribute('draggable','true');
+    it.addEventListener('dragstart', e=>{ dragEl=it; e.dataTransfer.effectAllowed='move'; setTimeout(()=>it.classList.add('dragging'),0); });
+    it.addEventListener('dragend', ()=>{ it.classList.remove('dragging'); dragEl=null; _dndSave(container, sel, key); });
+  });
+  container.addEventListener('dragover', e=>{
+    e.preventDefault();
+    if(!dragEl) return;
+    const after=_dndAfter(container, sel, dragEl, e.clientX);
+    if(after==null) container.appendChild(dragEl); else container.insertBefore(dragEl, after);
+  });
+}
+function initSortable(){
+  makeSortable(document.getElementById('deptTabs'), '.dept-tab', 'dept');
+  makeSortable(document.getElementById('hrVacTabs'), '.vac-btn', 'vac');
+  makeSortable(document.getElementById('kopyDeptTabs'), '.month-tab', 'kdept');
+}
+
+// ===== INIT =====
+window.addEventListener('load', async ()=>{
+  // одноразовая очистка ранее сохранённых планов спидометра
+  try{ if(!localStorage.getItem('_gplanResetV3')){ Object.keys(localStorage).filter(k=>k.indexOf('gplan_')===0).forEach(k=>localStorage.removeItem(k)); localStorage.setItem('_gplanResetV3','1'); } }catch(e){}
+  // Fetch live data from Google Sheets (fallback: hardcoded data above)
+  try {
+    const live = await fetchLiveData();
+    if (live.length >= 3) {
+      months = live;
+      allWeeks = months.flatMap((m,mi) => (m.weeks||[]).map(w=>({...w,mi})));
+      console.log('✅ Данные из Google Sheets загружены:', live.length, 'месяцев');
+    }
+  } catch(e) {
+    console.warn('⚠️ Google Sheets недоступен, используются кешированные данные:', e.message);
+    const b=document.getElementById('liveBadge');
+    if(b){ b.textContent='○ Кеш'; b.title='Google-таблица недоступна — показаны сохранённые данные'; }
+  }
+  initSortable();
+  restoreNav();
+  updateActualLabel();
+  setInterval(updateActualLabel, 60000);
+});
+</script>
+</body>
+</html>
