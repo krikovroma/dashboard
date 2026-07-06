@@ -2294,7 +2294,7 @@ function renderSalesDash(d){
   const baseIdx=3; // «Назначено встреч» — база конверсий
   const baseVal=month[baseIdx]||1;
   const kcls=['blue','purple','green','orange','teal','blue','green'];
-  const planSet=new Set(nn.slice(-4));
+  const planSet=new Set(nn); // поля плана у всех этапов (вкл. звонки, КП, дожимы)
   document.getElementById('slKpiRow').innerHTML = nn.map((idx,j)=>{
     const showPct=idx>baseIdx;
     const pct=Math.round(month[idx]/baseVal*100);
@@ -2383,7 +2383,8 @@ function renderSalesGoing(){
   const mult=elapsed>0?total/elapsed:0;
   const sub=document.getElementById('slGoingSub');
   if(sub) sub.textContent=`прогноз на конец месяца · прошло ${elapsed} из ${total} раб. дней · план — пунктир`;
-  wrap.innerHTML = _salesPlanStages().map(i=>{
+  const nnAll=month.map((v,i)=>v==null?-1:i).filter(i=>i>=0); // все этапы, вкл. звонки/КП/дожимы
+  wrap.innerHTML = nnAll.map(i=>{
     const plan=parseFloat(getSalesPlan(i)), fact=month[i]||0;
     const proj=elapsed>0?Math.round(fact*mult):0;
     if(!(plan>0)) return `<div class="going-row"><div class="going-lbl">${stages[i]}</div><div class="going-bar"></div><div class="going-num" style="color:${txt}">— / —</div></div>`;
