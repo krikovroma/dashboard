@@ -732,7 +732,7 @@ body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
         <div class="funnel-list" id="slFunnelWrap" style="padding-top:6px"></div>
         <div id="slFunnelSvg" style="display:none;padding-top:2px"></div>
       </div>
-      <div id="slGaugeGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px"></div>
+      <div id="slGaugeGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px"></div>
     </div>
 
     <div class="charts-row cols-2">
@@ -2312,6 +2312,12 @@ function renderSalesDash(d){
       <div class="kpi-footer">${footer}</div>
     </div>`;
   }).join('');
+  // Приходы товара
+  kpiHtml+=`<div class="kpi-card orange">
+    <div class="kpi-label">Приходы товара</div>
+    <div class="kpi-value">${d.prihod||0}</div>
+    <div class="kpi-footer"><span class="kpi-plan" style="margin-left:auto">план —</span></div>
+  </div>`;
   // Оплаты (выручка)
   const oplPct=mo.oplatyP?Math.round((mo.oplaty||0)/mo.oplatyP*100):null;
   const oplCls=oplPct==null?'':(oplPct>=70?'exec-good':oplPct>=40?'exec-ok':'exec-bad');
@@ -2370,16 +2376,20 @@ function renderSalesGaugeGrid(){
   const grid=document.getElementById('slGaugeGrid'); if(!grid) return;
   const d=curSalesData; if(!d){ grid.innerHTML=''; return; }
   const pace=_paceInfo(slSelMonth);
-  grid.innerHTML = _salesPlanStages().map(idx=>{
-    const fact=d.month[idx]||0, plan=parseFloat(getSalesPlan(idx)), hasPlan=plan>0;
-    const proj=pace.elapsed>0?Math.round(fact*pace.mult):0;
-    const pct=hasPlan?Math.round(proj/plan*100):0;
-    const tip=hasPlan?`Скорость к цели: за ${pace.elapsed} из ${pace.total} раб. дней — факт ${fact}. С таким темпом к концу месяца будет ${proj} из ${plan} (${pct}%).`:'План не задан';
-    return `<div class="chart-card" style="padding:10px 10px;display:flex;flex-direction:column;min-width:0" title="${tip}">
-      <div class="chart-title" style="font-size:11.5px;line-height:1.15">${SALES_STAGES[idx]}</div>
+  // этапы с планом + выручка
+  const items=_salesPlanStages().map(idx=>({label:SALES_STAGES[idx], fact:d.month[idx]||0, plan:parseFloat(getSalesPlan(idx))||0, money:false}));
+  if(d.money&&d.money.oplatyP>0) items.push({label:'Оплаты (выручка)', fact:d.money.oplaty||0, plan:d.money.oplatyP, money:true});
+  const f=(it,v)=>it.money?fmt(v):v;
+  grid.innerHTML = items.map(it=>{
+    const hasPlan=it.plan>0;
+    const proj=pace.elapsed>0?Math.round(it.fact*pace.mult):0;
+    const pct=hasPlan?Math.round(proj/it.plan*100):0;
+    const tip=hasPlan?`Скорость к цели: за ${pace.elapsed} из ${pace.total} раб. дней — факт ${f(it,it.fact)}. С таким темпом к концу месяца будет ${f(it,proj)} из ${f(it,it.plan)} (${pct}%).`:'План не задан';
+    return `<div class="chart-card" style="padding:8px 8px;display:flex;flex-direction:column;min-width:0" title="${tip}">
+      <div class="chart-title" style="font-size:11px;line-height:1.15">${it.label}</div>
       <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
         ${buildMiniGaugeSvg(pct,hasPlan)}
-        <div style="text-align:center;font-size:11px;color:${isDark?'#e6edf3':'#24292f'};margin-top:2px">факт ${fact} · план ${hasPlan?plan:'—'} · идём на ${hasPlan?proj:'—'}</div>
+        <div style="text-align:center;font-size:10px;color:${isDark?'#e6edf3':'#24292f'};margin-top:2px">факт ${f(it,it.fact)} · план ${hasPlan?f(it,it.plan):'—'} · идём на ${hasPlan?f(it,proj):'—'}</div>
       </div>
     </div>`;
   }).join('');
@@ -2400,16 +2410,18 @@ function renderSalesGoing(){
   const sub=document.getElementById('slGoingSub');
   if(sub) sub.textContent=`прогноз на конец месяца · прошло ${elapsed} из ${total} раб. дней · план — пунктир`;
   const nnAll=month.map((v,i)=>v==null?-1:i).filter(i=>i>=0); // все этапы, вкл. звонки/КП/дожимы
-  wrap.innerHTML = nnAll.map(i=>{
-    const plan=parseFloat(getSalesPlan(i)), fact=month[i]||0;
-    const proj=elapsed>0?Math.round(fact*mult):0;
-    if(!(plan>0)) return `<div class="going-row"><div class="going-lbl">${stages[i]}</div><div class="going-bar"></div><div class="going-num" style="color:${txt}">— / —</div></div>`;
-    const frac=proj/plan, w=Math.max(2,Math.min(100,Math.round(frac*100)));
+  const rows=nnAll.map(i=>({label:stages[i], fact:month[i]||0, plan:parseFloat(getSalesPlan(i))||0, money:false}));
+  rows.push({label:'Оплаты (выручка)', fact:(d.money&&d.money.oplaty)||0, plan:(d.money&&d.money.oplatyP)||0, money:true});
+  wrap.innerHTML = rows.map(r=>{
+    const fv=v=>r.money?fmt(v):v;
+    const proj=elapsed>0?Math.round(r.fact*mult):0;
+    if(!(r.plan>0)) return `<div class="going-row"><div class="going-lbl">${r.label}</div><div class="going-bar"></div><div class="going-num" style="color:${txt}">— / —</div></div>`;
+    const frac=proj/r.plan, w=Math.max(2,Math.min(100,Math.round(frac*100)));
     const cc=frac>=1?'#2ea043':frac>=0.7?'#d4a017':'#e5534b';
     return `<div class="going-row">
-      <div class="going-lbl">${stages[i]}</div>
-      <div class="going-bar" title="прогноз ${proj} из плана ${plan} (факт ${fact} за ${elapsed} дн.)"><div class="going-fill" style="width:${w}%;background:${cc}"></div></div>
-      <div class="going-num"><b style="color:${cc}">${proj}</b> <span style="color:${txt}">/ ${plan}</span></div>
+      <div class="going-lbl">${r.label}</div>
+      <div class="going-bar" title="прогноз ${fv(proj)} из плана ${fv(r.plan)} (факт ${fv(r.fact)} за ${elapsed} дн.)"><div class="going-fill" style="width:${w}%;background:${cc}"></div></div>
+      <div class="going-num"><b style="color:${cc}">${fv(proj)}</b> <span style="color:${txt}">/ ${fv(r.plan)}</span></div>
     </div>`;
   }).join('');
 }
@@ -2432,19 +2444,25 @@ function renderSalesTable(d, nn, cv){
     if(k!==curKey){ cur={days:[],sum:Array(n).fill(0)}; groups.push(cur); curKey=k; }
     cur.days.push(x); x.s.forEach((v,i)=>cur.sum[i]+=v);
   });
-  const cvCells=vals=>{ const o=stages.map(()=>''); for(let k=1;k<nn.length;k++){const i=nn[k],j=nn[k-1]; o[i]=(vals[j]?Math.round(vals[i]/vals[j]*100):0)+'%';} return o.map(t=>`<td>${t}</td>`).join(''); };
+  const prD=d.prihodDays||{}, opD=d.oplatyDays||{};
+  const cvCells=vals=>{ const o=stages.map(()=>''); for(let k=1;k<nn.length;k++){const i=nn[k],j=nn[k-1]; o[i]=(vals[j]?Math.round(vals[i]/vals[j]*100):0)+'%';} return o.map(t=>`<td>${t}</td>`).join('')+'<td></td><td></td>'; };
   const nums=arr=>arr.map(v=>`<td>${v==null?'–':(v===0?'<span class="z">0</span>':v)}</td>`).join('');
-  const spacer=`<tr class="wsp"><td colspan="${n+1}"></td></tr>`;
+  const mcell=v=>`<td>${v>0?fmt(v):'<span class="z">0</span>'}</td>`;
+  const spacer=`<tr class="wsp"><td colspan="${n+3}"></td></tr>`;
   let rows='';
   groups.forEach(g=>{
-    g.days.forEach(x=>{ rows+=`<tr><td><span class="dow">${x.wd}</span>${x.d}</td>${nums(x.s)}</tr>`; });
-    rows+=`<tr class="wk"><td>Неделя</td>${nums(g.sum)}</tr>`;
+    let wPr=0, wOp=0;
+    g.days.forEach(x=>{
+      const pr=prD[x.d]||0, op=opD[x.d]||0; wPr+=pr; wOp+=op;
+      rows+=`<tr><td><span class="dow">${x.wd}</span>${x.d}</td>${nums(x.s)}${mcell(pr)}${mcell(op)}</tr>`;
+    });
+    rows+=`<tr class="wk"><td>Неделя</td>${nums(g.sum)}${mcell(wPr)}${mcell(wOp)}</tr>`;
     rows+=`<tr class="cv cvw"><td>CV%</td>${cvCells(g.sum)}</tr>`;
     rows+=spacer;
   });
-  rows+=`<tr class="mo"><td>Месяц</td>${nums(month)}</tr>`;
+  rows+=`<tr class="mo"><td>Месяц</td>${nums(month)}${mcell(d.prihod||0)}${mcell((d.money&&d.money.oplaty)||0)}</tr>`;
   rows+=`<tr class="cv"><td>CV%</td>${cvCells(month)}</tr>`;
-  const head=`<tr><th>Дата</th>${stages.map(s=>`<th>${s}</th>`).join('')}</tr>`;
+  const head=`<tr><th>Дата</th>${stages.map(s=>`<th>${s}</th>`).join('')}<th>Приходы товара</th><th>Оплаты</th></tr>`;
   document.getElementById('slTableWrap').innerHTML=`<table class="vt"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
   document.getElementById('slTableSub').textContent=mgrName(slMgr)+' · '+slSelMonth;
 }
@@ -2834,7 +2852,7 @@ function _parseSalesSheet(rows, monthName, out){
     if(c0 && c0!=='0'){
       const mgr=SALES_MGRS.find(x=>x.key!=='all' && c0.indexOf(x.name.split(' ')[0])===0);
       if(mgr){
-        cur={month:Array(7).fill(0),plan:Array(7).fill(null),money:{oplaty:0,oplatyP:null,pribyl:0,pribylP:null,premiya:0,premiyaP:null},_days:{}};
+        cur={month:Array(7).fill(0),plan:Array(7).fill(null),money:{oplaty:0,oplatyP:null,pribyl:0,pribylP:null,premiya:0,premiyaP:null},prihod:0,_days:{},_prihodDays:{},_oplatyDays:{}};
         (out[mgr.key]=out[mgr.key]||{})[monthName]=cur;
       } else cur=null;
       planCtx='';
@@ -2865,7 +2883,8 @@ function _parseSalesSheet(rows, monthName, out){
         cur.month[si]+=v;
         if(v>0)(cur._days[dayCol[ci]]=cur._days[dayCol[ci]]||Array(7).fill(0))[si]+=v;
       });
-    } else if(mlbl==='Оплаты сегодня'){ dayIdx.forEach(ci=>cur.money.oplaty+=_num(r[ci])); }
+    } else if(mlbl==='Оплаты сегодня'){ dayIdx.forEach(ci=>{ const v=_num(r[ci]); cur.money.oplaty+=v; if(v>0) cur._oplatyDays[dayCol[ci]]=(cur._oplatyDays[dayCol[ci]]||0)+v; }); }
+    else if(mlbl==='Приходов товара сегодня'){ dayIdx.forEach(ci=>{ const v=_num(r[ci]); cur.prihod+=v; if(v>0) cur._prihodDays[dayCol[ci]]=(cur._prihodDays[dayCol[ci]]||0)+v; }); }
     else if(mlbl==='Прибыль по оплаченным'){ dayIdx.forEach(ci=>cur.money.pribyl+=_num(r[ci])); }
     else if(mlbl==='Премия менеджера'){ dayIdx.forEach(ci=>cur.money.premiya+=_num(r[ci])); }
   }
@@ -2881,7 +2900,10 @@ async function fetchSalesLive(){
   for(const k in out){ for(const mn in out[k]){
     const d=out[k][mn];
     d.days=Object.entries(d._days).map(([dd,s])=>({d:dd,s})).sort((a,b)=>a.d.localeCompare(b.d));
-    delete d._days;
+    d.prihodDays=d._prihodDays; d.oplatyDays=d._oplatyDays;
+    delete d._days; delete d._prihodDays; delete d._oplatyDays;
+    // плана по дожимам в таблице нет — приравниваем к плану КП
+    if(d.plan[2]==null && d.plan[1]!=null) d.plan[2]=d.plan[1];
     if(!d.month.some(v=>v>0) && d.money.oplaty<=0) delete out[k][mn];
   }}
   // «По всем» = сумма менеджеров
@@ -2890,13 +2912,16 @@ async function fetchSalesLive(){
   months.forEach(mn=>{
     const parts=Object.keys(out).map(k=>out[k][mn]).filter(Boolean);
     if(!parts.length) return;
-    const agg={month:Array(7).fill(0),plan:Array(7).fill(null),money:{oplaty:0,oplatyP:null,pribyl:0,pribylP:null,premiya:0,premiyaP:null},days:[]};
+    const agg={month:Array(7).fill(0),plan:Array(7).fill(null),money:{oplaty:0,oplatyP:null,pribyl:0,pribylP:null,premiya:0,premiyaP:null},prihod:0,days:[],prihodDays:{},oplatyDays:{}};
     const dmap={};
     parts.forEach(p=>{
       p.month.forEach((v,i)=>agg.month[i]+=v);
       p.plan.forEach((v,i)=>{ if(v!=null) agg.plan[i]=(agg.plan[i]||0)+v; });
       ['oplaty','pribyl','premiya'].forEach(f=>agg.money[f]+=p.money[f]||0);
       ['oplatyP','pribylP','premiyaP'].forEach(f=>{ if(p.money[f]!=null) agg.money[f]=(agg.money[f]||0)+p.money[f]; });
+      agg.prihod+=p.prihod||0;
+      Object.entries(p.prihodDays||{}).forEach(([dd,v])=>agg.prihodDays[dd]=(agg.prihodDays[dd]||0)+v);
+      Object.entries(p.oplatyDays||{}).forEach(([dd,v])=>agg.oplatyDays[dd]=(agg.oplatyDays[dd]||0)+v);
       p.days.forEach(dd=>{ const t=(dmap[dd.d]=dmap[dd.d]||Array(7).fill(0)); dd.s.forEach((v,i)=>t[i]+=v); });
     });
     agg.days=Object.entries(dmap).map(([dd,s])=>({d:dd,s})).sort((a,b)=>a.d.localeCompare(b.d));
