@@ -2049,6 +2049,7 @@ function buildSalesMgrTabs(){
   row.innerHTML = SALES_MGRS.map(m=>
     `<button class="vac-btn${m.key===slMgr?' active':''}" data-mgr="${m.key}" onclick="switchSalesMgr('${m.key}')">${m.name}</button>`
   ).join('');
+  makeSortable(row, '.vac-btn', 'slmgr'); // порядок менеджеров тоже запоминается
 }
 function buildSalesMonthTabs(){
   const row=document.getElementById('slMonthTabs'); if(!row) return;
@@ -2496,23 +2497,31 @@ function saveNav(){ try{
   localStorage.setItem('nav_slmgr', slMgr);
   localStorage.setItem('nav_slmonth', slSelMonth);
 }catch(e){} }
-function restoreNav(){
-  let dept='glavnye';
-  try{
-    const m=localStorage.getItem('nav_month'); if(m && mopMonthsList.includes(m)) mopSelMonth=m;
-    const v=localStorage.getItem('nav_vac'); if(v && hrVacs[v]) hrVac=v;
-    const kd=localStorage.getItem('nav_kdept'); if(kd==='hr'||kd==='prodazhi') kopyDept=kd;
-    const dd=localStorage.getItem('nav_dept'); if(dd==='glavnye'||dd==='kopy') dept=dd;
-    const sm=localStorage.getItem('nav_slmgr'); if(sm && SALES_DATA[sm]) slMgr=sm;
-    const smo=localStorage.getItem('nav_slmonth'); if(smo && salesMonthsList.includes(smo)) slSelMonth=smo;
-  }catch(e){}
+// При загрузке всегда открываем САМЫЕ ЛЕВЫЕ вкладки каждого ряда
+// (с учётом сохранённого drag-and-drop-порядка — initSortable уже переставил DOM).
+function applyDefaultNav(){
   buildSalesMgrTabs();
+  // вакансия найма — левая
+  const vt=document.querySelector('#hrVacTabs .vac-btn');
+  if(vt && vt.dataset.vac && hrVacs[vt.dataset.vac]) hrVac=vt.dataset.vac;
+  document.querySelectorAll('#hrVacTabs .vac-btn').forEach(b=>b.classList.toggle('active', b.dataset.vac===hrVac));
+  // менеджер продаж — левый
+  const mt=document.querySelector('#slMgrTabs .vac-btn');
+  if(mt && mt.dataset.mgr && SALES_DATA[mt.dataset.mgr]) slMgr=mt.dataset.mgr;
+  document.querySelectorAll('#slMgrTabs .vac-btn').forEach(b=>b.classList.toggle('active', b.dataset.mgr===slMgr));
+  // подраздел КОПов — левый
+  const kt=document.querySelector('#kopyDeptTabs .month-tab');
+  if(kt && kt.dataset.kdept) kopyDept=kt.dataset.kdept;
   document.querySelectorAll('#kopyDeptTabs .month-tab').forEach(t=>t.classList.toggle('active', t.dataset.kdept===kopyDept));
   const kh=document.getElementById('kopy-hr'), kp=document.getElementById('kopy-prodazhi');
   if(kh) kh.style.display = kopyDept==='hr'?'':'none';
   if(kp) kp.style.display = kopyDept==='prodazhi'?'':'none';
-  document.querySelectorAll('#hrVacTabs .vac-btn').forEach(b=>b.classList.toggle('active', b.dataset.vac===hrVac));
-  switchDept(dept);
+  // месяцы — последние, по которым есть данные
+  { const a=mopMonthsList.filter(m=>(VAC_DATA[hrVac]||{})[m]); if(a.length) mopSelMonth=a[a.length-1]; }
+  { const a=salesMonthsList.filter(m=>(SALES_DATA[slMgr]||{})[m]); if(a.length) slSelMonth=a[a.length-1]; }
+  // главный раздел — левая вкладка
+  const dt=document.querySelector('#deptTabs .dept-tab');
+  switchDept(dt && dt.dataset.dept ? dt.dataset.dept : 'glavnye');
 }
 
 // Доска «Главные цифры»: Склад (последний месяц) + Отдел продаж
@@ -2819,18 +2828,23 @@ function _dndRestore(container, sel, key){
 function makeSortable(container, sel, key){
   if(!container) return;
   _dndRestore(container, sel, key);
-  let dragEl=null;
+  container._dnd = container._dnd || {dragEl:null};
   container.querySelectorAll(sel).forEach(it=>{
+    if(it._dndItem) return; it._dndItem=true;
     it.setAttribute('draggable','true');
-    it.addEventListener('dragstart', e=>{ dragEl=it; e.dataTransfer.effectAllowed='move'; setTimeout(()=>it.classList.add('dragging'),0); });
-    it.addEventListener('dragend', ()=>{ it.classList.remove('dragging'); dragEl=null; _dndSave(container, sel, key); });
+    it.addEventListener('dragstart', e=>{ container._dnd.dragEl=it; e.dataTransfer.effectAllowed='move'; setTimeout(()=>it.classList.add('dragging'),0); });
+    it.addEventListener('dragend', ()=>{ it.classList.remove('dragging'); container._dnd.dragEl=null; _dndSave(container, sel, key); });
   });
-  container.addEventListener('dragover', e=>{
-    e.preventDefault();
-    if(!dragEl) return;
-    const after=_dndAfter(container, sel, dragEl, e.clientX);
-    if(after==null) container.appendChild(dragEl); else container.insertBefore(dragEl, after);
-  });
+  if(!container._dndBound){
+    container._dndBound=true;
+    container.addEventListener('dragover', e=>{
+      e.preventDefault();
+      const dragEl=container._dnd.dragEl;
+      if(!dragEl) return;
+      const after=_dndAfter(container, sel, dragEl, e.clientX);
+      if(after==null) container.appendChild(dragEl); else container.insertBefore(dragEl, after);
+    });
+  }
 }
 function initSortable(){
   makeSortable(document.getElementById('deptTabs'), '.dept-tab', 'dept');
@@ -2874,7 +2888,7 @@ window.addEventListener('load', async ()=>{
   try{ if(!localStorage.getItem('_gplanResetV3')){ Object.keys(localStorage).filter(k=>k.indexOf('gplan_')===0).forEach(k=>localStorage.removeItem(k)); localStorage.setItem('_gplanResetV3','1'); } }catch(e){}
   await loadLive(false);
   initSortable();
-  restoreNav();
+  applyDefaultNav();
   updateActualLabel();
   setInterval(updateActualLabel, 60000);
   // автообновление данных: каждые 5 минут + при возврате на вкладку
