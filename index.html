@@ -1742,11 +1742,16 @@ function _planKey(idx){ return 'gplan_'+hrVac+'_'+mopSelMonth+'_'+idx; }
 // Индексы = этапы VAC_META. Новые значения сообщать Claude — обновит здесь.
 const DEFAULT_HR_PLANS = { mopy:{3:40, 4:20, 5:10, 6:2} };
 function getPlan(idx){
+  const sv=storeGet(_planKey(idx)); if(sv!=null) return sv; // общее хранилище — приоритет
   try{ const v=localStorage.getItem(_planKey(idx)); if(v!=null&&v!=='') return v; }catch(e){}
   const dp=DEFAULT_HR_PLANS[hrVac]; if(dp&&dp[idx]!=null) return String(dp[idx]);
   return '';
 }
-function onKpiPlan(idx, el){ try{ if(el.value==='') localStorage.removeItem(_planKey(idx)); else localStorage.setItem(_planKey(idx), el.value); }catch(e){} renderGaugeGrid(); renderGoing(); }
+function onKpiPlan(idx, el){
+  try{ if(el.value==='') localStorage.removeItem(_planKey(idx)); else localStorage.setItem(_planKey(idx), el.value); }catch(e){}
+  storeSet(_planKey(idx), el.value);
+  renderGaugeGrid(); renderGoing();
+}
 // ===== ДАШБОРД «Идём на» (прогноз по темпу: факт × всего_дней / прошло_дней) =====
 function _workDays(year, mm, fromD, toD){ let c=0; for(let d=fromD; d<=toD; d++){ const dow=new Date(year,mm-1,d).getDay(); if(dow>=1&&dow<=5) c++; } return c; }
 // Темп движения к цели за месяц: прошло/всего раб. дней и множитель прогноза
@@ -2116,10 +2121,10 @@ function _salesPlanStages(){ const d=curSalesData; if(!d) return []; const nn=d.
 // KPI 30К (1-й месяц — план по КП, со 2-го — по встречам), 5% от маржи (40% от оплат) — всегда.
 function _slStartKey(){ return 'slstart_'+slMgr; }
 function _slTwKey(){ return 'sltw_'+slMgr; }
-function getSlStart(){ try{ return localStorage.getItem(_slStartKey())||''; }catch(e){ return ''; } }
-function getSlTw(){ try{ return localStorage.getItem(_slTwKey())||''; }catch(e){ return ''; } }
-function onSlStart(el){ try{ localStorage.setItem(_slStartKey(),el.value); }catch(e){} renderSalesSalary(curSalesData); }
-function onSlTw(el){ try{ localStorage.setItem(_slTwKey(),el.value); }catch(e){} renderSalesSalary(curSalesData); }
+function getSlStart(){ const sv=storeGet(_slStartKey()); if(sv!=null) return sv; try{ return localStorage.getItem(_slStartKey())||''; }catch(e){ return ''; } }
+function getSlTw(){ const sv=storeGet(_slTwKey()); if(sv!=null) return sv; try{ return localStorage.getItem(_slTwKey())||''; }catch(e){ return ''; } }
+function onSlStart(el){ try{ localStorage.setItem(_slStartKey(),el.value); }catch(e){} storeSet(_slStartKey(),el.value); renderSalesSalary(curSalesData); }
+function onSlTw(el){ try{ localStorage.setItem(_slTwKey(),el.value); }catch(e){} storeSet(_slTwKey(),el.value); renderSalesSalary(curSalesData); }
 function _dayNum(ds){ return parseInt(ds.split('.')[0],10); } // "01.07" -> 1
 function _fmtD(dt){ return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0'); }
 
@@ -2864,10 +2869,28 @@ function initSortable(){
 }
 
 // ===== INIT =====
+// ===== ОБЩЕЕ ХРАНИЛИЩЕ РУЧНЫХ ЗНАЧЕНИЙ (Google Apps Script → лист «_dashboard_store») =====
+// Планы найма, дата выхода и 2-нед. план менеджера сохраняются в таблицу и видны на всех устройствах.
+const STORE_URL='https://script.google.com/macros/s/AKfycbxIvWp0iibfXBmHykPUyDOtw3rEJ29DN04WS-9EPxQaGzwUWNh9lc9L2KwEDAaelvgw/exec';
+let _store=null;
+async function loadStore(){
+  if(!STORE_URL) return;
+  try{
+    const r=await fetch(STORE_URL+'?t='+Date.now());
+    if(r.ok) _store=await r.json();
+  }catch(e){ console.warn('⚠️ Хранилище недоступно:', e.message); }
+}
+function storeGet(k){ return _store&&Object.prototype.hasOwnProperty.call(_store,k)&&_store[k]!==''?String(_store[k]):null; }
+function storeSet(k,v){
+  if(_store) _store[k]=String(v);
+  if(!STORE_URL) return;
+  try{ fetch(STORE_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({[k]:String(v)})}).catch(()=>{}); }catch(e){}
+}
+
 // Загрузка живых данных; rerender=true — перерисовать текущий вид после обновления
 let _lastLiveOk = 0;
 async function loadLive(rerender){
-  const [fin, hr, sl] = await Promise.allSettled([fetchLiveData(), fetchHRLive(), fetchSalesLive()]);
+  const [fin, hr, sl] = await Promise.allSettled([fetchLiveData(), fetchHRLive(), fetchSalesLive(), loadStore()]);
   let ok=false;
   if(fin.status==='fulfilled' && fin.value.length>=3){
     months = fin.value;
