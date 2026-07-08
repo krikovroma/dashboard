@@ -1680,7 +1680,7 @@ function renderVacDash(d){
     const pcls = pct>=70?'exec-good':pct>=40?'exec-ok':'exec-bad';
     let footer;
     if(planSet.has(idx)){
-      footer = `${showPct?`<span class="kpi-exec ${pcls}">${pct}%</span>`:''}<span class="kpi-plan-wrap"><span class="kpi-plan-lbl">план</span><input class="kpi-plan-inp" type="number" min="0" value="${getPlan(idx)}" oninput="onKpiPlan(${idx},this)"></span>`;
+      footer = `${showPct?`<span class="kpi-exec ${pcls}" title="${baseLabel}">${pct}%</span><span class="kpi-plan">${baseLabel}</span>`:''}<span class="kpi-plan-wrap"><span class="kpi-plan-lbl">план</span><input class="kpi-plan-inp" type="number" min="0" value="${getPlan(idx)}" oninput="onKpiPlan(${idx},this)"></span>`;
     } else if(showPct){
       footer = `<span class="kpi-exec ${pcls}">${pct}%</span><span class="kpi-plan">${baseLabel}</span>`;
     } else {
@@ -2320,7 +2320,7 @@ function renderSalesDash(d){
     const pct=Math.round(month[idx]/baseVal*100);
     const pcls=pct>=70?'exec-good':pct>=40?'exec-ok':'exec-bad';
     const pv=getSalesPlan(idx); // план из таблицы, ручной ввод отключён
-    const footer=`${showPct?`<span class="kpi-exec ${pcls}">${pct}%</span>`:''}<span class="kpi-plan" style="margin-left:auto">план ${pv!==''?fmt(+pv):'—'}</span>`;
+    const footer=`${showPct?`<span class="kpi-exec ${pcls}" title="от назначенных встреч">${pct}%</span><span class="kpi-plan">от назначенных встреч</span>`:''}<span class="kpi-plan" style="margin-left:auto">план ${pv!==''?fmt(+pv):'—'}</span>`;
     return `<div class="kpi-card ${kcls[j%kcls.length]}">
       <div class="kpi-label">${stages[idx]}</div>
       <div class="kpi-value">${month[idx]}</div>
