@@ -743,6 +743,7 @@ body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
       <div class="chart-card">
         <div class="chart-head">
           <div><div class="chart-title">Активность по дням</div><div class="chart-sub" id="slDaySub">по дням месяца · выбранный этап</div></div>
+          <div style="text-align:right"><div id="slDayAvg" style="font-size:28px;font-weight:800;line-height:1;color:#0969da"></div><div style="font-size:10.5px;color:#57606a;margin-top:2px">в среднем за день</div></div>
         </div>
         <div class="stage-tabs" id="slDayTabs"></div>
         <div class="ch h220"><canvas id="slDayChart"></canvas></div>
@@ -2316,7 +2317,7 @@ function renderSalesDash(d){
   kpiHtml+=`<div class="kpi-card orange">
     <div class="kpi-label">Приходы товара</div>
     <div class="kpi-value">${d.prihod||0}</div>
-    <div class="kpi-footer"><span class="kpi-plan" style="margin-left:auto">план —</span></div>
+    <div class="kpi-footer"><span class="kpi-plan">&nbsp;</span></div>
   </div>`;
   // Оплаты (выручка)
   const oplPct=mo.oplatyP?Math.round((mo.oplaty||0)/mo.oplatyP*100):null;
@@ -2376,9 +2377,10 @@ function renderSalesGaugeGrid(){
   const grid=document.getElementById('slGaugeGrid'); if(!grid) return;
   const d=curSalesData; if(!d){ grid.innerHTML=''; return; }
   const pace=_paceInfo(slSelMonth);
-  // этапы с планом + выручка
-  const items=_salesPlanStages().map(idx=>({label:SALES_STAGES[idx], fact:d.month[idx]||0, plan:parseFloat(getSalesPlan(idx))||0, money:false}));
-  if(d.money&&d.money.oplatyP>0) items.push({label:'Оплаты (выручка)', fact:d.money.oplaty||0, plan:d.money.oplatyP, money:true});
+  // все этапы (даже без плана — у новых менеджеров планы появляются со временем) + выручка
+  const nnAll=d.month.map((v,i)=>v==null?-1:i).filter(i=>i>=0);
+  const items=nnAll.map(idx=>({label:SALES_STAGES[idx], fact:d.month[idx]||0, plan:parseFloat(getSalesPlan(idx))||0, money:false}));
+  items.push({label:'Оплаты (выручка)', fact:(d.money&&d.money.oplaty)||0, plan:(d.money&&d.money.oplatyP)||0, money:true});
   const f=(it,v)=>it.money?fmt(v):v;
   grid.innerHTML = items.map(it=>{
     const hasPlan=it.plan>0;
@@ -2528,9 +2530,14 @@ function renderSalesDayChart(){
   const nn=month.map((v,i)=>v==null?-1:i).filter(i=>i>=0);
   if(!nn.includes(slDayStage)) slDayStage=nn[0];
   const c=col[slDayStage];
+  // среднее в день за месяц (по прошедшим рабочим дням)
+  const pace=_paceInfo(slSelMonth);
+  const avgOf=i=>{ if(!pace.elapsed) return 0; const a=(month[i]||0)/pace.elapsed; return a>=10?Math.round(a):Math.round(a*10)/10; };
   document.getElementById('slDayTabs').innerHTML = stages.map((s,i)=> month[i]==null?'':
-    `<button class="stage-btn${i===slDayStage?' active':''}" style="${i===slDayStage?('background:'+c+';border-color:'+c+';color:#fff'):''}" onclick="setSalesDayStage(${i})">${s}</button>`).join('');
-  document.getElementById('slDaySub').textContent='по дням · '+stages[slDayStage];
+    `<button class="stage-btn${i===slDayStage?' active':''}" style="${i===slDayStage?('background:'+c+';border-color:'+c+';color:#fff'):''}" onclick="setSalesDayStage(${i})">${s} <span style="opacity:.72;font-weight:400">· ${avgOf(i)}</span></button>`).join('');
+  document.getElementById('slDaySub').textContent='по дням · '+stages[slDayStage]+' · в плашках — среднее в день';
+  const avgEl=document.getElementById('slDayAvg');
+  if(avgEl){ avgEl.textContent=avgOf(slDayStage); avgEl.style.color=c; }
   const [mName,yStr]=slSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
   const dim=new Date(year,mm,0).getDate();
   const dmap={}; d.days.forEach(x=>{ dmap[x.d]=x.s; });
