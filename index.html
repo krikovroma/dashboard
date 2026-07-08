@@ -712,13 +712,11 @@ body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
     <div class="mf-wrap"><div class="month-tabs" id="slMonthTabs"></div></div>
 
     <div id="sl-main" class="dash-col">
-    <!-- Деньги -->
-    <div class="kpi-row" id="slMoneyRow"></div>
-    <div id="slSalaryWrap"></div>
-    <!-- Воронка (этапы) -->
+    <!-- KPI: этапы воронки + оплаты + зарплата -->
     <div class="kpi-row" id="slKpiRow"></div>
+    <div id="slSalaryWrap" style="display:none"></div>
 
-    <div class="charts-row cols-3">
+    <div class="charts-row cols-3g">
       <div class="chart-card">
         <div class="chart-head"><div><div class="chart-title">Таблица по дням</div><div class="chart-sub" id="slTableSub">детализация за месяц</div></div></div>
         <div class="vt-wrap" id="slTableWrap"></div>
@@ -734,7 +732,7 @@ body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
         <div class="funnel-list" id="slFunnelWrap" style="padding-top:6px"></div>
         <div id="slFunnelSvg" style="display:none;padding-top:2px"></div>
       </div>
-      <div id="slGaugeGrid" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:14px"></div>
+      <div id="slGaugeGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px"></div>
     </div>
 
     <div class="charts-row cols-2">
@@ -748,6 +746,17 @@ body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
         </div>
         <div class="stage-tabs" id="slDayTabs"></div>
         <div class="ch h220"><canvas id="slDayChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><div class="chart-title">Конверсии по дням</div><div class="chart-sub" id="slCvSub">по дням месяца · выбранная конверсия</div></div>
+          <div style="text-align:right"><div id="slCvAvg" style="font-size:28px;font-weight:800;line-height:1;color:#0969da"></div><div style="font-size:10.5px;color:#57606a;margin-top:2px">средняя за месяц</div></div>
+        </div>
+        <div class="stage-tabs" id="slCvTabs"></div>
+        <div class="ch h220"><canvas id="slCvChart"></canvas></div>
       </div>
     </div>
     </div><!-- /sl-main -->
@@ -2096,8 +2105,8 @@ function getSalesPlan(idx){
   const d=curSalesData; if(d&&d.plan&&d.plan[idx]!=null) return String(d.plan[idx]);
   return '';
 }
-// последние 4 непустых этапа — с планом (как в найме)
-function _salesPlanStages(){ const d=curSalesData; if(!d) return []; const nn=d.month.map((v,i)=>v==null?-1:i).filter(i=>i>=0); return nn.slice(-4); }
+// этапы для спидометров: только те, у которых задан план в таблице
+function _salesPlanStages(){ const d=curSalesData; if(!d||!d.plan) return []; return d.month.map((v,i)=>v==null?-1:i).filter(i=>i>=0 && d.plan[i]!=null && d.plan[i]>0); }
 
 // ===== ЗАРПЛАТА МЕНЕДЖЕРА (накопительно на сегодня) =====
 // Мотивация с 01.07.2026: фикс 30К (условие — 2-недельный план звонков),
@@ -2106,16 +2115,19 @@ function _slStartKey(){ return 'slstart_'+slMgr; }
 function _slTwKey(){ return 'sltw_'+slMgr; }
 function getSlStart(){ const sv=storeGet(_slStartKey()); if(sv!=null) return sv; try{ return localStorage.getItem(_slStartKey())||''; }catch(e){ return ''; } }
 function getSlTw(){ const sv=storeGet(_slTwKey()); if(sv!=null) return sv; try{ return localStorage.getItem(_slTwKey())||''; }catch(e){ return ''; } }
-function onSlStart(el){ try{ localStorage.setItem(_slStartKey(),el.value); }catch(e){} storeSet(_slStartKey(),el.value); renderSalesSalary(curSalesData); }
+function onSlStart(el){ try{ localStorage.setItem(_slStartKey(),el.value); }catch(e){} storeSet(_slStartKey(),el.value); renderSalesDash(curSalesData); }
 // план 2-недельки: oninput только сохраняет (без перерисовки — иначе поле теряет фокус), onchange перерисовывает
 function slTwSave(el){ try{ localStorage.setItem(_slTwKey(),el.value); }catch(e){} storeSet(_slTwKey(),el.value); }
-function onSlTw(el){ slTwSave(el); renderSalesSalary(curSalesData); }
+function onSlTw(el){ slTwSave(el); renderSalesDash(curSalesData); }
 function _dayNum(ds){ return parseInt(ds.split('.')[0],10); } // "01.07" -> 1
 function _fmtD(dt){ return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0'); }
 
+let slSalaryOpen=false;
+function toggleSalary(){ slSalaryOpen=!slSalaryOpen; renderSalesDash(curSalesData); }
 function renderSalesSalary(d){
-  const wrap=document.getElementById('slSalaryWrap'); if(!wrap) return;
-  if(!d || slMgr==='all'){ wrap.innerHTML=''; return; }
+  const wrap=document.getElementById('slSalaryWrap'); if(!wrap) return null;
+  wrap.style.display = (slMgr!=='all' && slSalaryOpen) ? '' : 'none';
+  if(!d || slMgr==='all'){ wrap.innerHTML=''; return null; }
   const FIX=30000, KPIB=30000, MARG=0.4, PCT=0.05;
   const txt=isDark?'#8b949e':'#57606a', strong=isDark?'#e6edf3':'#24292f';
   const [mName,yStr]=slSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
@@ -2147,7 +2159,7 @@ function renderSalesSalary(d){
       </div>${inputs}</div>
       <div style="font-size:12px;color:${txt}">Укажите дату выхода на работу и двухнедельный план по звонкам — и здесь появится расчёт зарплаты.</div>
     </div>`;
-    return;
+    return null;
   }
 
   // --- Номер месяца работы (для KPI: 1-й — план по КП, со 2-го — встречи) ---
@@ -2263,10 +2275,11 @@ function renderSalesSalary(d){
         <b>2) KPI 30 000 р.</b> — ${mIdx<=1?'первый месяц работы, план по КП':'месяц работы №'+mIdx+', план по проведённым встречам'}: факт ${kpiFact} из ${kpiPlan||'—'} (${kpiSt}). Платится в конце месяца${monthClosed?'':' — в «заработано» пока 0, в прогнозе '+fmt(kpiProjSum)+' р.'}. При выполнении: 30 000 × ${worked}/${totalWD} отраб. дней = ${fmt(kpiFull)} р.<br><br>
         <b>3) Премия 5%</b>: оплаты ${fmt(opl)} р. → маржа 40% = ${fmt(margin)} р. → 5% = <b>${fmt(bonus)} р.</b> Прогноз: при текущем темпе оплаты ${fmt(oplProj)} р. → премия ${fmt(bonusProj)} р.<br><br>
         <b>Итого на ${monthClosed?'конец месяца':'сегодня'}</b>: ${fmt(fixEarned)} (фикс) + ${fmt(kpiEarned)} (KPI) + ${fmt(bonus)} (5%) = <b>${fmt(earned)} р.</b><br>
-        <span style="color:${txt}">Дата выхода и план звонков хранятся в браузере этого устройства.</span>
+        <span style="color:${txt}">Дата выхода и план звонков синхронизируются между устройствами через таблицу.</span>
       </div>
     </details>
   </div>`;
+  return {earned, proj};
 }
 
 function renderSalesDash(d){
@@ -2279,39 +2292,43 @@ function renderSalesDash(d){
   const cv=month.map(()=>null);
   for(let k=1;k<nn.length;k++){ const i=nn[k], j=nn[k-1]; cv[i]=month[j]?+(month[i]/month[j]*100).toFixed(1):0; }
 
-  // ---- Деньги ----
-  const mo=d.money||{};
-  const moneyCards=[
-    {lbl:'Оплаты (выручка)',v:mo.oplaty,p:mo.oplatyP,cls:'green'},
-    {lbl:'Прибыль',         v:mo.pribyl,p:mo.pribylP,cls:'blue'},
-    {lbl:'Премия менеджера',v:mo.premiya,p:mo.premiyaP,cls:'purple'},
-  ];
-  document.getElementById('slMoneyRow').innerHTML = moneyCards.map(c=>{
-    const pct=c.p?Math.round((c.v||0)/c.p*100):null;
-    const pcls=pct==null?'':(pct>=70?'exec-good':pct>=40?'exec-ok':'exec-bad');
-    return `<div class="kpi-card ${c.cls}">
-      <div class="kpi-label">${c.lbl}</div>
-      <div class="kpi-value" style="font-size:20px">${fmt(c.v||0)}</div>
-      <div class="kpi-footer">${pct!=null?`<span class="kpi-exec ${pcls}">${pct}%</span>`:''}<span class="kpi-plan">план ${fmt(c.p||0)}</span></div>
-    </div>`;
-  }).join('');
+  // ---- Зарплата (детальный блок; возвращает суммы для KPI-карточки) ----
+  const sal = renderSalesSalary(d);
 
-  // ---- KPI по этапам воронки ----
+  // ---- KPI: этапы воронки + оплаты + зарплата ----
+  const mo=d.money||{};
   const baseIdx=3; // «Назначено встреч» — база конверсий
   const baseVal=month[baseIdx]||1;
   const kcls=['blue','purple','green','orange','teal','blue','green'];
-  document.getElementById('slKpiRow').innerHTML = nn.map((idx,j)=>{
+  let kpiHtml = nn.map((idx,j)=>{
     const showPct=idx>baseIdx;
     const pct=Math.round(month[idx]/baseVal*100);
     const pcls=pct>=70?'exec-good':pct>=40?'exec-ok':'exec-bad';
     const pv=getSalesPlan(idx); // план из таблицы, ручной ввод отключён
-    const footer=`${showPct?`<span class="kpi-exec ${pcls}" title="от назначенных встреч">${pct}%</span><span class="kpi-plan">от назначенных встреч</span>`:''}<span class="kpi-plan" style="margin-left:auto">план ${pv!==''?fmt(+pv):'—'}</span>`;
+    const footer=`${showPct?`<span class="kpi-exec ${pcls}" title="от назначенных встреч">${pct}%</span><span class="kpi-plan">от назначенных встреч</span>`:''}<span class="kpi-plan" style="margin-left:auto">план ${pv!==''?(+pv).toLocaleString('ru-RU'):'—'}</span>`;
     return `<div class="kpi-card ${kcls[j%kcls.length]}">
       <div class="kpi-label">${stages[idx]}</div>
       <div class="kpi-value">${month[idx]}</div>
       <div class="kpi-footer">${footer}</div>
     </div>`;
   }).join('');
+  // Оплаты (выручка)
+  const oplPct=mo.oplatyP?Math.round((mo.oplaty||0)/mo.oplatyP*100):null;
+  const oplCls=oplPct==null?'':(oplPct>=70?'exec-good':oplPct>=40?'exec-ok':'exec-bad');
+  kpiHtml+=`<div class="kpi-card green">
+    <div class="kpi-label">Оплаты (выручка)</div>
+    <div class="kpi-value" style="font-size:20px">${fmt(mo.oplaty||0)}</div>
+    <div class="kpi-footer">${oplPct!=null?`<span class="kpi-exec ${oplCls}">${oplPct}%</span>`:''}<span class="kpi-plan" style="margin-left:auto">план ${fmt(mo.oplatyP||0)}</span></div>
+  </div>`;
+  // Зарплата менеджера (клик — подробный расчёт)
+  if(slMgr!=='all'){
+    kpiHtml+=`<div class="kpi-card purple" style="cursor:pointer" onclick="toggleSalary()" title="Нажмите, чтобы ${slSalaryOpen?'скрыть':'показать'} подробный расчёт">
+      <div class="kpi-label">💰 Зарплата на сегодня</div>
+      <div class="kpi-value" style="font-size:20px">${sal?fmt(sal.earned)+' р.':'—'}</div>
+      <div class="kpi-footer"><span class="kpi-plan">${sal?'прогноз '+fmt(sal.proj)+' р.':'нужна настройка'}</span><span class="kpi-plan" style="margin-left:auto;color:#0969da">${slSalaryOpen?'скрыть ▴':'подробнее ▾'}</span></div>
+    </div>`;
+  }
+  document.getElementById('slKpiRow').innerHTML = kpiHtml;
 
   document.getElementById('slFunnelTitle').textContent='Воронка продаж — '+mgrName(slMgr);
   document.getElementById('slFunnelSub').textContent=slSelMonth+' · накопительно за месяц';
@@ -2326,11 +2343,11 @@ function renderSalesDash(d){
   document.getElementById('slFunnelSvg').innerHTML = buildFunnelSvg(stages,col,month,cv,nn);
   setSalesFunnelView(slFunnelView);
 
-  // Зарплата менеджера
-  renderSalesSalary(d);
   // Активность по дням
   if(!nn.includes(slDayStage)) slDayStage=nn[0];
   renderSalesDayChart();
+  // Конверсии по дням
+  renderSalesCvChart();
   // Таблица
   renderSalesTable(d,nn,cv);
   // Спидометры
@@ -2433,6 +2450,60 @@ function renderSalesTable(d, nn, cv){
 }
 
 function setSalesDayStage(i){ slDayStage=i; renderSalesDayChart(); }
+
+// ===== КОНВЕРСИИ ПО ДНЯМ (отдел продаж) =====
+const SALES_CV_PAIRS=[
+  [0,1,'Звонки → КП'],
+  [1,2,'КП → Дожимы'],
+  [2,3,'Дожимы → Назначено встреч'],
+  [3,4,'Назначено → Проведено'],
+  [4,5,'Проведено → Договоры'],
+  [5,6,'Договоры → Новые клиенты'],
+];
+let slCvIdx=0;
+function setSalesCv(i){ slCvIdx=i; renderSalesCvChart(); }
+function renderSalesCvChart(){
+  const d=curSalesData; if(!d) return;
+  const tabs=document.getElementById('slCvTabs'); if(!tabs) return;
+  const n=SALES_STAGES.length, col=STAGE_PAL[n]||STAGE_PAL[6];
+  const [a,b,label]=SALES_CV_PAIRS[slCvIdx];
+  const c=col[b];
+  tabs.innerHTML=SALES_CV_PAIRS.map((p,i)=>
+    `<button class="stage-btn${i===slCvIdx?' active':''}" style="${i===slCvIdx?('background:'+col[p[1]]+';border-color:'+col[p[1]]+';color:#fff'):''}" onclick="setSalesCv(${i})">${p[2]}</button>`
+  ).join('');
+  document.getElementById('slCvSub').textContent='по дням · '+label;
+  // средняя конверсия за месяц
+  const avg=(d.month[a]||0)>0?Math.round((d.month[b]||0)/d.month[a]*100):0;
+  const avgEl=document.getElementById('slCvAvg');
+  if(avgEl){ avgEl.textContent=avg+'%'; avgEl.style.color=c; }
+  // дневные значения
+  const [mName,yStr]=slSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
+  const dim=new Date(year,mm,0).getDate();
+  const dmap={}; (d.days||[]).forEach(x=>{ dmap[x.d]=x.s; });
+  const labels=[], data=[], bg=[], bd=[];
+  for(let dd=1;dd<=dim;dd++){
+    const dow=new Date(year,mm-1,dd).getDay();
+    if(dow===0||dow===6) continue;
+    const key=String(dd).padStart(2,'0')+'.'+String(mm).padStart(2,'0');
+    labels.push([String(dd).padStart(2,'0'), _WD[dow]]);
+    const s=dmap[key];
+    data.push(s && s[a]>0 ? Math.round(s[b]/s[a]*100) : 0);
+    bg.push(c+'cc'); bd.push(c);
+  }
+  killChart('slCv');
+  const o=baseOpts('bar');
+  o.plugins.tooltip.callbacks.label=ctx=>' '+label+': '+ctx.raw+'%';
+  o.plugins.tooltip.callbacks.title=items=>Array.isArray(items[0].label)?items[0].label.join(' '):items[0].label;
+  o.layout={padding:{top:18}};
+  o.scales.x.ticks.autoSkip=false; o.scales.x.ticks.maxRotation=0; o.scales.x.ticks.minRotation=0; o.scales.x.ticks.font={size:9};
+  o.scales.y.ticks=Object.assign(o.scales.y.ticks||{},{callback:v=>v+'%'});
+  charts['slCv']=new Chart(document.getElementById('slCvChart'),{
+    type:'bar',
+    data:{labels,datasets:[{label,data,backgroundColor:bg,borderColor:bd,borderWidth:1.5,borderRadius:4}]},
+    options:o,
+    plugins:[barLabelPlugin({datasets:'all',fontSize:9,formatter:v=>v?v+'%':'',color:c})]
+  });
+}
 function renderSalesDayChart(){
   const d=curSalesData; if(!d) return;
   const stages=SALES_STAGES, n=stages.length, col=STAGE_PAL[n]||STAGE_PAL[6], month=d.month;
