@@ -85,6 +85,7 @@ body.dark .going-bar { border-color:#484f58; }
 .charts-row { display:grid;gap:14px; }
 .cols-2 { grid-template-columns:1fr 1fr; }
 .cols-3 { grid-template-columns:1.4fr 1fr 1fr; }
+.cols-3g { grid-template-columns:1.05fr 0.85fr 1.5fr; } /* найм: шире колонка спидометров 3×2 */
 .gsel,.ginp { font-size:12px;padding:5px 8px;border:1px solid #d0d7de;border-radius:6px;background:#fff;color:#24292f;font-family:inherit; }
 .ginp { width:88px; }
 body.dark .gsel,body.dark .ginp { background:#0d1117;border-color:#30363d;color:#e6edf3; }
@@ -654,7 +655,7 @@ body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
     <div id="vac-mopy" class="dash-col">
     <div class="kpi-row" id="vacKpiRow"></div>
 
-    <div class="charts-row cols-3">
+    <div class="charts-row cols-3g">
       <div class="chart-card">
         <div class="chart-head"><div><div class="chart-title">Таблица по дням</div><div class="chart-sub" id="vacTableSub">детализация за месяц</div></div></div>
         <div class="vt-wrap" id="vacTableWrap"></div>
@@ -670,7 +671,7 @@ body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
         <div class="funnel-list" id="mopFunnelWrap" style="padding-top:6px"></div>
         <div id="mopFunnelSvg" style="display:none;padding-top:2px"></div>
       </div>
-      <div id="gaugeGrid" style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:14px"></div>
+      <div id="gaugeGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px"></div>
     </div>
 
     <div class="charts-row cols-2">
@@ -1672,7 +1673,7 @@ function renderVacDash(d){
   const baseVal = month[baseIdx] || 1;
   const baseLabel = stages[baseIdx].startsWith('Назначено') ? 'от назначенных интервью' : ('от «'+stages[baseIdx].toLowerCase()+'»');
   const kcls = ['blue','purple','green','orange','teal'];
-  const planSet = new Set(nn.slice(-4)); // последние 4 этапа — с полем плана
+  const planSet = new Set(nn); // поля плана у всех KPI
   document.getElementById('vacKpiRow').innerHTML = nn.map((idx,j)=>{
     const showPct = idx > baseIdx; // конверсии только после этапа «Назначено»
     const pct = Math.round(month[idx]/baseVal*100);
@@ -1725,7 +1726,17 @@ function gaugeColor(p){ return p>=100?'#1a7f37':p>=50?'#9a6700':'#cf222e'; }
 function _gPol(cx,cy,r,ang){ const a=(ang-90)*Math.PI/180; return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; }
 function _gArc(cx,cy,r,a0,a1){ const [sx,sy]=_gPol(cx,cy,r,a0), [ex,ey]=_gPol(cx,cy,r,a1); const lg=Math.abs(a1-a0)>180?1:0, sw=a1>a0?1:0; return `M ${sx.toFixed(1)} ${sy.toFixed(1)} A ${r} ${r} 0 ${lg} ${sw} ${ex.toFixed(1)} ${ey.toFixed(1)}`; }
 // этапы, по которым ставим план (последние до 4 непустых этапов воронки)
-function _planStages(){ const d=curVacData; if(!d) return []; const nn=d.month.map((v,i)=>v==null?-1:i).filter(i=>i>=0); return nn.slice(-4); }
+// Все непустые этапы вакансии (порядок воронки)
+function _planStages(){ const d=curVacData; if(!d) return []; return d.month.map((v,i)=>v==null?-1:i).filter(i=>i>=0); }
+// Этапы для спидометров: максимум 6 (3×2); если больше — убираем промежуточный «Дошли…»
+function _gaugeStages(){
+  let nn=_planStages();
+  if(nn.length>6){
+    const st=VAC_META[hrVac].stages;
+    nn=nn.filter(i=>st[i].indexOf('Дошл')!==0);
+  }
+  return nn.slice(0,6);
+}
 function _planKey(idx){ return 'gplan_'+hrVac+'_'+mopSelMonth+'_'+idx; }
 // Дефолтные планы найма (общие для всех устройств; локальный ввод переопределяет).
 // Индексы = этапы VAC_META. Новые значения сообщать Claude — обновит здесь.
@@ -1797,7 +1808,7 @@ function renderGaugeGrid(){
   const d=curVacData; if(!d){ grid.innerHTML=''; return; }
   const stages=VAC_META[hrVac].stages, txt=isDark?'#8b949e':'#57606a';
   const pace=_paceInfo(mopSelMonth);
-  grid.innerHTML = _planStages().map(idx=>{
+  grid.innerHTML = _gaugeStages().map(idx=>{
     const fact=d.month[idx]||0, plan=parseFloat(getPlan(idx)), hasPlan=plan>0;
     const proj=pace.elapsed>0?Math.round(fact*pace.mult):0;
     const pct=hasPlan?Math.round(proj/plan*100):0;
