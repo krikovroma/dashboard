@@ -1673,19 +1673,12 @@ function renderVacDash(d){
   const baseVal = month[baseIdx] || 1;
   const baseLabel = stages[baseIdx].startsWith('Назначено') ? 'от назначенных интервью' : ('от «'+stages[baseIdx].toLowerCase()+'»');
   const kcls = ['blue','purple','green','orange','teal'];
-  const planSet = new Set(nn); // поля плана у всех KPI
   document.getElementById('vacKpiRow').innerHTML = nn.map((idx,j)=>{
     const showPct = idx > baseIdx; // конверсии только после этапа «Назначено»
     const pct = Math.round(month[idx]/baseVal*100);
     const pcls = pct>=70?'exec-good':pct>=40?'exec-ok':'exec-bad';
-    let footer;
-    if(planSet.has(idx)){
-      footer = `${showPct?`<span class="kpi-exec ${pcls}" title="${baseLabel}">${pct}%</span><span class="kpi-plan">${baseLabel}</span>`:''}<span class="kpi-plan-wrap"><span class="kpi-plan-lbl">план</span><input class="kpi-plan-inp" type="number" min="0" value="${getPlan(idx)}" oninput="onKpiPlan(${idx},this)"></span>`;
-    } else if(showPct){
-      footer = `<span class="kpi-exec ${pcls}">${pct}%</span><span class="kpi-plan">${baseLabel}</span>`;
-    } else {
-      footer = `<span class="kpi-plan">&nbsp;</span>`;
-    }
+    const pv=getPlan(idx); // план из листа «Планы», ручной ввод отключён
+    const footer = `${showPct?`<span class="kpi-exec ${pcls}" title="${baseLabel}">${pct}%</span><span class="kpi-plan">${baseLabel}</span>`:''}<span class="kpi-plan" style="margin-left:auto">план ${pv!==''?fmt(+pv):'—'}</span>`;
     return `<div class="kpi-card ${kcls[j%kcls.length]}">
       <div class="kpi-label">${stages[idx]}</div>
       <div class="kpi-value">${month[idx]}</div>
@@ -1737,20 +1730,10 @@ function _gaugeStages(){
   }
   return nn.slice(0,6);
 }
-function _planKey(idx){ return 'gplan_'+hrVac+'_'+mopSelMonth+'_'+idx; }
-// Дефолтные планы найма (общие для всех устройств; локальный ввод переопределяет).
-// Индексы = этапы VAC_META. Новые значения сообщать Claude — обновит здесь.
-const DEFAULT_HR_PLANS = { mopy:{3:40, 4:20, 5:10, 6:2} };
+// Планы найма — только из листа «Планы» Google-таблицы (ручной ввод в дашборде убран)
 function getPlan(idx){
-  const sv=storeGet(_planKey(idx)); if(sv!=null) return sv; // общее хранилище — приоритет
-  try{ const v=localStorage.getItem(_planKey(idx)); if(v!=null&&v!=='') return v; }catch(e){}
-  const dp=DEFAULT_HR_PLANS[hrVac]; if(dp&&dp[idx]!=null) return String(dp[idx]);
-  return '';
-}
-function onKpiPlan(idx, el){
-  try{ if(el.value==='') localStorage.removeItem(_planKey(idx)); else localStorage.setItem(_planKey(idx), el.value); }catch(e){}
-  storeSet(_planKey(idx), el.value);
-  renderGaugeGrid(); renderGoing();
+  const v=((HR_PLANS[hrVac]||{})[mopSelMonth]||{})[idx];
+  return v!=null?String(v):'';
 }
 // ===== ДАШБОРД «Идём на» (прогноз по темпу: факт × всего_дней / прошло_дней) =====
 function _workDays(year, mm, fromD, toD){ let c=0; for(let d=fromD; d<=toD; d++){ const dow=new Date(year,mm-1,d).getDay(); if(dow>=1&&dow<=5) c++; } return c; }
@@ -2678,6 +2661,32 @@ async function fetchLiveData() {
 // ===== LIVE: КОПы найма и отдела продаж из опубликованных Google-таблиц =====
 const HR_PUB   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpRaqowaxkdeK1EsVEjQxzbkcvvAJNg09lOLtUIGW-0To7m52q39vobnSBOeZYhsyIM_MldcNe7Oie/pub';
 const HR_GID   = 584545826; // лист «КОПы МОП удаленно» (все вакансии колонками)
+const HR_PLANS_GID = 288015708; // лист «Планы»: Вакансия | Этап | месяцы…
+let HR_PLANS = {}; // {vac:{'Июль 2026':{stageIdx:число}}}
+
+// Планы найма из листа «Планы» таблицы найма
+function _normTxt(s){ return String(s||'').toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim(); }
+async function fetchHRPlans(){
+  const resp=await fetch(HR_PUB+'?gid='+HR_PLANS_GID+'&single=true&output=csv');
+  if(!resp.ok) throw new Error('Планы HTTP '+resp.status);
+  const rows=_csv(await resp.text());
+  if(rows.length<2) return;
+  const months=[]; // [колонка, 'Июль 2026']
+  rows[0].forEach((c,i)=>{ if(i>=2 && c.trim()) months.push([i, c.trim()]); });
+  const vacOf=s=>{ s=_normTxt(s); if(s.indexOf('моп')===0)return 'mopy'; if(s.indexOf('склад')===0)return 'sklad'; if(s.indexOf('роп')===0)return 'ropy'; if(s.indexOf('аккаунт')===0)return 'akkaunt'; return null; };
+  const out={};
+  for(let r=1;r<rows.length;r++){
+    const vac=vacOf(rows[r][0]); if(!vac) continue;
+    const stage=_normTxt(rows[r][1]); if(!stage) continue;
+    const idx=VAC_META[vac].stages.findIndex(s=>_normTxt(s)===stage);
+    if(idx<0) continue;
+    months.forEach(([ci,mn])=>{
+      const v=parseFloat(String(rows[r][ci]||'').replace(/\s/g,''));
+      if(!isNaN(v)&&v>0){ ((out[vac]=out[vac]||{})[mn]=out[vac][mn]||{})[idx]=v; }
+    });
+  }
+  HR_PLANS=out;
+}
 const SALES_PUB = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSlMBb7dpLR0GM7jy0JwjA63qGnCcYCmTCxyYKYKPVki1mViadV3v4DR5gGnhQxjBRPzvFP8SImAW_t/pub';
 const SALES_SHEETS = { // месячные листы КОПов продаж → gid
   'Январь 2026':435720990,'Февраль 2026':980561998,'Март 2026':759152786,
@@ -2897,7 +2906,8 @@ function storeSet(k,v){
 // Загрузка живых данных; rerender=true — перерисовать текущий вид после обновления
 let _lastLiveOk = 0;
 async function loadLive(rerender){
-  const [fin, hr, sl] = await Promise.allSettled([fetchLiveData(), fetchHRLive(), fetchSalesLive(), loadStore()]);
+  const [fin, hr, sl, , hp] = await Promise.allSettled([fetchLiveData(), fetchHRLive(), fetchSalesLive(), loadStore(), fetchHRPlans()]);
+  if(hp && hp.status==='rejected') console.warn('⚠️ Лист «Планы» не загрузился:', hp.reason&&hp.reason.message);
   let ok=false;
   if(fin.status==='fulfilled' && fin.value.length>=3){
     months = fin.value;
