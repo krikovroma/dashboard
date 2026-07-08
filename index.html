@@ -1727,7 +1727,14 @@ function _gArc(cx,cy,r,a0,a1){ const [sx,sy]=_gPol(cx,cy,r,a0), [ex,ey]=_gPol(cx
 // этапы, по которым ставим план (последние до 4 непустых этапов воронки)
 function _planStages(){ const d=curVacData; if(!d) return []; const nn=d.month.map((v,i)=>v==null?-1:i).filter(i=>i>=0); return nn.slice(-4); }
 function _planKey(idx){ return 'gplan_'+hrVac+'_'+mopSelMonth+'_'+idx; }
-function getPlan(idx){ try{ const v=localStorage.getItem(_planKey(idx)); return v==null?'':v; }catch(e){ return ''; } }
+// Дефолтные планы найма (общие для всех устройств; локальный ввод переопределяет).
+// Индексы = этапы VAC_META. Новые значения сообщать Claude — обновит здесь.
+const DEFAULT_HR_PLANS = { mopy:{3:40, 4:20, 5:10, 6:2} };
+function getPlan(idx){
+  try{ const v=localStorage.getItem(_planKey(idx)); if(v!=null&&v!=='') return v; }catch(e){}
+  const dp=DEFAULT_HR_PLANS[hrVac]; if(dp&&dp[idx]!=null) return String(dp[idx]);
+  return '';
+}
 function onKpiPlan(idx, el){ try{ if(el.value==='') localStorage.removeItem(_planKey(idx)); else localStorage.setItem(_planKey(idx), el.value); }catch(e){} renderGaugeGrid(); renderGoing(); }
 // ===== ДАШБОРД «Идём на» (прогноз по темпу: факт × всего_дней / прошло_дней) =====
 function _workDays(year, mm, fromD, toD){ let c=0; for(let d=fromD; d<=toD; d++){ const dow=new Date(year,mm-1,d).getDay(); if(dow>=1&&dow<=5) c++; } return c; }
@@ -2084,14 +2091,11 @@ function renderSalesContent(){
   saveNav();
 }
 
-// planы спидометров: localStorage → иначе значение из листа (month.plan)
-function _slPlanKey(idx){ return 'splan_'+slMgr+'_'+slSelMonth+'_'+idx; }
+// Планы продаж — только из Google-таблицы (блок «Накопленный итог за месяц»)
 function getSalesPlan(idx){
-  try{ const v=localStorage.getItem(_slPlanKey(idx)); if(v!=null&&v!=='') return v; }catch(e){}
   const d=curSalesData; if(d&&d.plan&&d.plan[idx]!=null) return String(d.plan[idx]);
   return '';
 }
-function onSalesPlan(idx,el){ try{ if(el.value==='') localStorage.removeItem(_slPlanKey(idx)); else localStorage.setItem(_slPlanKey(idx), el.value); }catch(e){} renderSalesGaugeGrid(); renderSalesGoing(); }
 // последние 4 непустых этапа — с планом (как в найме)
 function _salesPlanStages(){ const d=curSalesData; if(!d) return []; const nn=d.month.map((v,i)=>v==null?-1:i).filter(i=>i>=0); return nn.slice(-4); }
 
@@ -2294,19 +2298,12 @@ function renderSalesDash(d){
   const baseIdx=3; // «Назначено встреч» — база конверсий
   const baseVal=month[baseIdx]||1;
   const kcls=['blue','purple','green','orange','teal','blue','green'];
-  const planSet=new Set(nn); // поля плана у всех этапов (вкл. звонки, КП, дожимы)
   document.getElementById('slKpiRow').innerHTML = nn.map((idx,j)=>{
     const showPct=idx>baseIdx;
     const pct=Math.round(month[idx]/baseVal*100);
     const pcls=pct>=70?'exec-good':pct>=40?'exec-ok':'exec-bad';
-    let footer;
-    if(planSet.has(idx)){
-      footer=`${showPct?`<span class="kpi-exec ${pcls}">${pct}%</span>`:''}<span class="kpi-plan-wrap"><span class="kpi-plan-lbl">план</span><input class="kpi-plan-inp" type="number" min="0" value="${getSalesPlan(idx)}" oninput="onSalesPlan(${idx},this)"></span>`;
-    } else if(showPct){
-      footer=`<span class="kpi-exec ${pcls}">${pct}%</span><span class="kpi-plan">от назначенных</span>`;
-    } else {
-      footer=`<span class="kpi-plan">&nbsp;</span>`;
-    }
+    const pv=getSalesPlan(idx); // план из таблицы, ручной ввод отключён
+    const footer=`${showPct?`<span class="kpi-exec ${pcls}">${pct}%</span>`:''}<span class="kpi-plan" style="margin-left:auto">план ${pv!==''?fmt(+pv):'—'}</span>`;
     return `<div class="kpi-card ${kcls[j%kcls.length]}">
       <div class="kpi-label">${stages[idx]}</div>
       <div class="kpi-value">${month[idx]}</div>
@@ -2553,16 +2550,22 @@ function toggleTheme(){
 const SHEET_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQkhk_qMauh_cqJNCWEvjMFikvWXs0TQL_05qOovBUBYGykd20j8jyzH9pwIXVttuTEwDVkWn-eDcdO/pub?gid=881121812&single=true&output=csv';
 
 function _csv(text) {
-  const rows = [];
-  for (const line of text.replace(/\r/g,'').split('\n')) {
-    const row = []; let inQ = false, f = '';
-    for (const c of line) {
-      if (c === '"') inQ = !inQ;
-      else if (c === ',' && !inQ) { row.push(f.trim()); f = ''; }
-      else f += c;
+  // Полноценный CSV: кавычки, экранированные кавычки, переводы строк внутри ячеек
+  const rows=[]; let row=[], f='', inQ=false;
+  text=text.replace(/\r/g,'');
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){ f+='"'; i++; } else inQ=false; }
+      else f+=c;
+    } else {
+      if(c==='"') inQ=true;
+      else if(c===','){ row.push(f.trim()); f=''; }
+      else if(c==='\n'){ row.push(f.trim()); rows.push(row); row=[]; f=''; }
+      else f+=c;
     }
-    row.push(f.trim()); rows.push(row);
   }
+  row.push(f.trim()); rows.push(row);
   return rows;
 }
 
@@ -2645,6 +2648,157 @@ async function fetchLiveData() {
   return live;
 }
 
+// ===== LIVE: КОПы найма и отдела продаж из опубликованных Google-таблиц =====
+const HR_PUB   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpRaqowaxkdeK1EsVEjQxzbkcvvAJNg09lOLtUIGW-0To7m52q39vobnSBOeZYhsyIM_MldcNe7Oie/pub';
+const HR_GID   = 584545826; // лист «КОПы МОП удаленно» (все вакансии колонками)
+const SALES_PUB = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSlMBb7dpLR0GM7jy0JwjA63qGnCcYCmTCxyYKYKPVki1mViadV3v4DR5gGnhQxjBRPzvFP8SImAW_t/pub';
+const SALES_SHEETS = { // месячные листы КОПов продаж → gid
+  'Январь 2026':435720990,'Февраль 2026':980561998,'Март 2026':759152786,
+  'Апрель 2026':33124323,'Июнь 2026':2133597092,'Июль 2026':154591457,'Август 2026':1283900942
+};
+function _num(s){ if(s==null) return 0; const v=parseInt(String(s).replace(/[^\d-]/g,'')); return isNaN(v)?0:v; }
+const _MN_FULL=['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+// --- Найм: дни по вакансиям (колоночные группы МОПы/РОПы/Склад/Аккаунт) ---
+async function fetchHRLive(){
+  const resp=await fetch(HR_PUB+'?gid='+HR_GID+'&single=true&output=csv');
+  if(!resp.ok) throw new Error('HR HTTP '+resp.status);
+  const rows=_csv(await resp.text());
+  const groups=[['mopy','МОП'],['ropy','РОП'],['sklad','Склад'],['akkaunt','Аккаунт']];
+  const colOf={};
+  for(const [key,label] of groups){
+    outer:
+    for(let r=0;r<3&&r<rows.length;r++){
+      for(let c=0;c<(rows[r]||[]).length;c++){
+        if((rows[r][c]||'').indexOf(label)===0){ colOf[key]=c+1; break outer; }
+      }
+    }
+  }
+  const out={};
+  for(const r of rows){
+    const m=(r[0]||'').trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    if(!m) continue;
+    const monthName=_MN_FULL[+m[2]]+' '+m[3];
+    for(const [key] of groups){
+      const st=colOf[key]; if(st==null) continue;
+      const n=VAC_META[key].stages.length;
+      const vals=[]; let any=false;
+      for(let i=0;i<n;i++){
+        const raw=(r[st+i]||'').trim();
+        if(raw!=='') any=true;
+        vals.push(_num(raw));
+      }
+      if(!any || !vals.some(v=>v>0)) continue;
+      const o=(out[key]=out[key]||{}); const mo=(o[monthName]=o[monthName]||{days:[]});
+      mo.days.push({d:m[1]+'.'+m[2], s:vals});
+    }
+  }
+  // итоги месяца + недели (пн–пт)
+  for(const key in out){ for(const mn in out[key]){
+    const o=out[key][mn], n=VAC_META[key].stages.length, yr=+mn.split(' ')[1];
+    o.month=Array(n).fill(0);
+    o.days.forEach(dd=>dd.s.forEach((v,i)=>o.month[i]+=v));
+    const wk={};
+    o.days.forEach(dd=>{
+      const [d,mm]=dd.d.split('.').map(Number);
+      const dt=new Date(yr,mm-1,d); const mon=new Date(yr,mm-1,d-((dt.getDay()+6)%7));
+      const k=mon.getTime();
+      (wk[k]=wk[k]||[]).push(dd);
+    });
+    o.weeks=Object.keys(wk).map(Number).sort((a,b)=>a-b).map(k=>{
+      const ds=wk[k]; const s=Array(n).fill(0); ds.forEach(dd=>dd.s.forEach((v,i)=>s[i]+=v));
+      return {w:ds[0].d+'–'+ds[ds.length-1].d, s};
+    });
+  }}
+  return out;
+}
+
+// --- Продажи: месячные листы, блоки менеджеров, планы из «Накопленный итог» ---
+function _parseSalesSheet(rows, monthName, out){
+  if(!rows||!rows.length) return;
+  const dayCol={};
+  (rows[0]||[]).forEach((c,i)=>{ const m=(c||'').trim().match(/^(\d{2})\.(\d{2})$/); if(m) dayCol[i]=m[1]+'.'+m[2]; });
+  const dayIdx=Object.keys(dayCol).map(Number);
+  if(!dayIdx.length) return;
+  const METRIC={'Факт холодные звонки':0,'Общее КП':1,'Дожимы':2,'Назначено встреч':3,'Встреча':4,'Договор':5,'Новый клиент':6};
+  let cur=null, planCtx='';
+  for(const r of rows){
+    const c0=(r[0]||'').trim(), c1=(r[1]||'').trim(), c2=(r[2]||'').trim(), c3=(r[3]||'').trim(), c4=(r[4]||'').trim();
+    if(c0 && c0!=='0'){
+      const mgr=SALES_MGRS.find(x=>x.key!=='all' && c0.indexOf(x.name.split(' ')[0])===0);
+      if(mgr){
+        cur={month:Array(7).fill(0),plan:Array(7).fill(null),money:{oplaty:0,oplatyP:null,pribyl:0,pribylP:null,premiya:0,premiyaP:null},_days:{}};
+        (out[mgr.key]=out[mgr.key]||{})[monthName]=cur;
+      } else cur=null;
+      planCtx='';
+      continue;
+    }
+    if(!cur) continue;
+    if(c4==='план'){
+      const val=_num(r[5]);
+      if(c2) planCtx=c2;
+      if(c2==='Звонки') cur.plan[0]=val;
+      else if((c2==='КП'&&c3==='Общее')||(planCtx==='КП'&&c3==='Общее')) cur.plan[1]=val;
+      else if(c2==='Встречи'&&c3==='Назначено') cur.plan[3]=val;
+      else if(planCtx==='Встречи'&&c3==='Проведено') cur.plan[4]=val;
+      else if(c2.indexOf('Договоры')===0) cur.plan[5]=val;
+      else if(c2==='Новые клиенты') cur.plan[6]=val;
+      else if(c2==='Оплаты') cur.money.oplatyP=val;
+      else if(c2.indexOf('Прибыль')===0) cur.money.pribylP=val;
+      else if(c2==='Премия менеджера') cur.money.premiyaP=val;
+      continue;
+    }
+    if(c4==='факт'||c4==='%') continue;
+    const lbl = METRIC.hasOwnProperty(c2) ? c2 : (METRIC.hasOwnProperty(c1) ? c1 : null); // метка бывает в col1 («Общее КП»)
+    const mlbl = c2 || c1;
+    if(lbl!=null){
+      const si=METRIC[lbl];
+      dayIdx.forEach(ci=>{
+        const v=_num(r[ci]);
+        cur.month[si]+=v;
+        if(v>0)(cur._days[dayCol[ci]]=cur._days[dayCol[ci]]||Array(7).fill(0))[si]+=v;
+      });
+    } else if(mlbl==='Оплаты сегодня'){ dayIdx.forEach(ci=>cur.money.oplaty+=_num(r[ci])); }
+    else if(mlbl==='Прибыль по оплаченным'){ dayIdx.forEach(ci=>cur.money.pribyl+=_num(r[ci])); }
+    else if(mlbl==='Премия менеджера'){ dayIdx.forEach(ci=>cur.money.premiya+=_num(r[ci])); }
+  }
+}
+async function fetchSalesLive(){
+  const entries=Object.entries(SALES_SHEETS);
+  const res=await Promise.allSettled(entries.map(([mn,gid])=>
+    fetch(SALES_PUB+'?gid='+gid+'&single=true&output=csv').then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.text(); })
+  ));
+  const out={};
+  res.forEach((x,i)=>{ if(x.status==='fulfilled') _parseSalesSheet(_csv(x.value), entries[i][0], out); });
+  // финализация менеджеров: дни map→массив; пустые месяцы выбрасываем
+  for(const k in out){ for(const mn in out[k]){
+    const d=out[k][mn];
+    d.days=Object.entries(d._days).map(([dd,s])=>({d:dd,s})).sort((a,b)=>a.d.localeCompare(b.d));
+    delete d._days;
+    if(!d.month.some(v=>v>0) && d.money.oplaty<=0) delete out[k][mn];
+  }}
+  // «По всем» = сумма менеджеров
+  const months=new Set(); Object.values(out).forEach(m=>Object.keys(m).forEach(x=>months.add(x)));
+  const all={};
+  months.forEach(mn=>{
+    const parts=Object.keys(out).map(k=>out[k][mn]).filter(Boolean);
+    if(!parts.length) return;
+    const agg={month:Array(7).fill(0),plan:Array(7).fill(null),money:{oplaty:0,oplatyP:null,pribyl:0,pribylP:null,premiya:0,premiyaP:null},days:[]};
+    const dmap={};
+    parts.forEach(p=>{
+      p.month.forEach((v,i)=>agg.month[i]+=v);
+      p.plan.forEach((v,i)=>{ if(v!=null) agg.plan[i]=(agg.plan[i]||0)+v; });
+      ['oplaty','pribyl','premiya'].forEach(f=>agg.money[f]+=p.money[f]||0);
+      ['oplatyP','pribylP','premiyaP'].forEach(f=>{ if(p.money[f]!=null) agg.money[f]=(agg.money[f]||0)+p.money[f]; });
+      p.days.forEach(dd=>{ const t=(dmap[dd.d]=dmap[dd.d]||Array(7).fill(0)); dd.s.forEach((v,i)=>t[i]+=v); });
+    });
+    agg.days=Object.entries(dmap).map(([dd,s])=>({d:dd,s})).sort((a,b)=>a.d.localeCompare(b.d));
+    all[mn]=agg;
+  });
+  if(Object.keys(all).length) out.all=all;
+  return out;
+}
+
 // ===== DRAG & DROP: перестановка вкладок/разделов мышкой =====
 function _dndAfter(container, sel, dragEl, x){
   const els=[...container.querySelectorAll(sel)].filter(e=>e!==dragEl);
@@ -2688,24 +2842,31 @@ function initSortable(){
 // Загрузка живых данных; rerender=true — перерисовать текущий вид после обновления
 let _lastLiveOk = 0;
 async function loadLive(rerender){
-  try {
-    const live = await fetchLiveData();
-    if (live.length >= 3) {
-      months = live;
-      allWeeks = months.flatMap((m,mi) => (m.weeks||[]).map(w=>({...w,mi})));
-      _lastLiveOk = Date.now();
-      const b=document.getElementById('liveBadge');
-      if(b){ b.textContent='● Live'; b.title='Данные из Google-таблицы · автообновление каждые 5 минут и при возврате на вкладку'; }
-      if(rerender) renderCurrentView();
-      updateActualLabel();
-      return true;
-    }
-  } catch(e) {
-    console.warn('⚠️ Google Sheets недоступен, используются кешированные данные:', e.message);
-    const b=document.getElementById('liveBadge');
-    if(b){ b.textContent='○ Кеш'; b.title='Google-таблица недоступна — показаны сохранённые данные'; }
+  const [fin, hr, sl] = await Promise.allSettled([fetchLiveData(), fetchHRLive(), fetchSalesLive()]);
+  let ok=false;
+  if(fin.status==='fulfilled' && fin.value.length>=3){
+    months = fin.value;
+    allWeeks = months.flatMap((m,mi) => (m.weeks||[]).map(w=>({...w,mi})));
+    ok=true;
+  } else if(fin.status==='rejected') console.warn('⚠️ Финансы не загрузились:', fin.reason&&fin.reason.message);
+  if(hr.status==='fulfilled'){
+    for(const k in hr.value){ VAC_DATA[k]=VAC_DATA[k]||{}; Object.assign(VAC_DATA[k], hr.value[k]); }
+    ok=true;
+  } else console.warn('⚠️ КОПы найма не загрузились:', hr.reason&&hr.reason.message);
+  if(sl.status==='fulfilled' && Object.keys(sl.value).length){
+    for(const k in sl.value){ SALES_DATA[k]=SALES_DATA[k]||{}; Object.assign(SALES_DATA[k], sl.value[k]); }
+    ok=true;
+  } else if(sl.status==='rejected') console.warn('⚠️ КОПы продаж не загрузились:', sl.reason&&sl.reason.message);
+  const b=document.getElementById('liveBadge');
+  if(ok){
+    _lastLiveOk = Date.now();
+    if(b){ b.textContent='● Live'; b.title='Данные из Google-таблиц · автообновление каждые 5 минут и при возврате на вкладку'; }
+    if(rerender) renderCurrentView();
+    updateActualLabel();
+  } else {
+    if(b){ b.textContent='○ Кеш'; b.title='Google-таблицы недоступны — показаны сохранённые данные'; }
   }
-  return false;
+  return ok;
 }
 
 window.addEventListener('load', async ()=>{
