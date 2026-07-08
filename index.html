@@ -2124,7 +2124,9 @@ function _slTwKey(){ return 'sltw_'+slMgr; }
 function getSlStart(){ const sv=storeGet(_slStartKey()); if(sv!=null) return sv; try{ return localStorage.getItem(_slStartKey())||''; }catch(e){ return ''; } }
 function getSlTw(){ const sv=storeGet(_slTwKey()); if(sv!=null) return sv; try{ return localStorage.getItem(_slTwKey())||''; }catch(e){ return ''; } }
 function onSlStart(el){ try{ localStorage.setItem(_slStartKey(),el.value); }catch(e){} storeSet(_slStartKey(),el.value); renderSalesSalary(curSalesData); }
-function onSlTw(el){ try{ localStorage.setItem(_slTwKey(),el.value); }catch(e){} storeSet(_slTwKey(),el.value); renderSalesSalary(curSalesData); }
+// план 2-недельки: oninput только сохраняет (без перерисовки — иначе поле теряет фокус), onchange перерисовывает
+function slTwSave(el){ try{ localStorage.setItem(_slTwKey(),el.value); }catch(e){} storeSet(_slTwKey(),el.value); }
+function onSlTw(el){ slTwSave(el); renderSalesSalary(curSalesData); }
 function _dayNum(ds){ return parseInt(ds.split('.')[0],10); } // "01.07" -> 1
 function _fmtD(dt){ return String(dt.getDate()).padStart(2,'0')+'.'+String(dt.getMonth()+1).padStart(2,'0'); }
 
@@ -2151,7 +2153,7 @@ function renderSalesSalary(d){
     <span style="font-size:11px;color:${txt}">вышла на работу</span>
     <input type="date" class="ginp" style="width:130px" value="${_esc(startStr)}" onchange="onSlStart(this)">
     <span style="font-size:11px;color:${txt}">план звонков / 2 нед.</span>
-    <input type="number" min="0" class="ginp" style="width:80px" value="${twPlan||''}" oninput="onSlTw(this)">
+    <input type="number" min="0" class="ginp" style="width:80px" value="${twPlan||''}" oninput="slTwSave(this)" onchange="onSlTw(this)">
   </span>`;
 
   if(!startDt || !(twPlan>0)){
@@ -2881,10 +2883,15 @@ async function loadStore(){
   }catch(e){ console.warn('⚠️ Хранилище недоступно:', e.message); }
 }
 function storeGet(k){ return _store&&Object.prototype.hasOwnProperty.call(_store,k)&&_store[k]!==''?String(_store[k]):null; }
+const _storeTimers={};
 function storeSet(k,v){
   if(_store) _store[k]=String(v);
   if(!STORE_URL) return;
-  try{ fetch(STORE_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({[k]:String(v)})}).catch(()=>{}); }catch(e){}
+  // дебаунс: отправляем финальное значение через 500 мс после последнего ввода
+  clearTimeout(_storeTimers[k]);
+  _storeTimers[k]=setTimeout(()=>{
+    try{ fetch(STORE_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({[k]:String(v)})}).catch(()=>{}); }catch(e){}
+  },500);
 }
 
 // Загрузка живых данных; rerender=true — перерисовать текущий вид после обновления
