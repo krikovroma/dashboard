@@ -2486,11 +2486,12 @@ async function fetchBankLive(){
     fetch(HR_PUB+'?gid='+CLIENTS_GID+'&single=true&output=csv').then(r=>{ if(!r.ok) throw new Error('Клиенты HTTP '+r.status); return r.text(); })
   ]);
   const brows=_csv(bt), crows=_csv(ct);
-  const mgrByInn={}, nameByInn={};
+  const mgrByInn={}, nameByInn={}, exclInn={};
   for(let i=1;i<crows.length;i++){
     const inn=(crows[i][0]||'').trim(); if(!inn) continue;
     nameByInn[inn]=(crows[i][1]||'').trim();
     const mm=(crows[i][2]||'').trim();
+    if(/^исключить/i.test(mm)){ exclInn[inn]=true; continue; } // «Исключить» в колонке «Менеджер» → не считать выручкой (внутренние пополнения и т.п.)
     if(mm){ const f=SALES_MGRS.find(x=>x.key!=='all'&&mm.indexOf(x.name.split(' ')[0])===0); if(f) mgrByInn[inn]=f.key; }
   }
   const payments=[];
@@ -2501,7 +2502,7 @@ async function fetchBankLive(){
     if(amt<=0) continue;
     payments.push({y:+dm[1], m:+dm[2], amt, inn:(r[2]||'').trim(), name:(r[3]||'').trim()});
   }
-  BANK_LIVE={payments, mgrByInn, nameByInn};
+  BANK_LIVE={payments, mgrByInn, nameByInn, exclInn};
 }
 function _clientShort(s){
   s=String(s||'').replace(/индивидуальный предприниматель/gi,'ИП').replace(/\s+/g,' ').trim();
@@ -2516,6 +2517,7 @@ function renderClientRevenue(){
   const byInn={};
   BANK_LIVE.payments.forEach(p=>{
     if(p.y!==year||p.m!==mm) return;
+    if(BANK_LIVE.exclInn[p.inn]) return; // исключённые плательщики («Исключить» в листе «Клиенты»)
     const mgr=BANK_LIVE.mgrByInn[p.inn]||null;
     if(slMgr!=='all' && mgr!==slMgr) return;
     const key=p.inn||p.name;
