@@ -750,7 +750,11 @@ body.dark ::-webkit-scrollbar-thumb { background:#30363d; }
       </div>
     </div>
 
-    <div class="charts-row">
+    <div class="charts-row cols-2">
+      <div class="chart-card">
+        <div class="chart-head"><div><div class="chart-title">Выручка клиентов</div><div class="chart-sub" id="slClientsSub">оплаты по банку · по убыванию</div></div></div>
+        <div id="slClientsWrap" style="padding-top:4px"></div>
+      </div>
       <div class="chart-card">
         <div class="chart-head">
           <div><div class="chart-title">Конверсии по дням</div><div class="chart-sub" id="slCvSub">по дням месяца · выбранная конверсия</div></div>
@@ -2355,6 +2359,8 @@ function renderSalesDash(d){
   renderSalesDayChart();
   // Конверсии по дням
   renderSalesCvChart();
+  // Выручка клиентов (банк)
+  renderClientRevenue();
   // Таблица
   renderSalesTable(d,nn,cv);
   // Спидометры
@@ -2470,6 +2476,70 @@ function renderSalesTable(d, nn, cv){
 }
 
 function setSalesDayStage(i){ slDayStage=i; renderSalesDayChart(); }
+
+// ===== ВЫРУЧКА КЛИЕНТОВ (оплаты из Точка Банка через листы «Банк»/«Клиенты») =====
+const BANK_GID=1140493356, CLIENTS_GID=1705520636;
+let BANK_LIVE=null; // {payments:[{y,m,amt,inn,name}], mgrByInn, nameByInn}
+async function fetchBankLive(){
+  const [bt,ct]=await Promise.all([
+    fetch(HR_PUB+'?gid='+BANK_GID+'&single=true&output=csv').then(r=>{ if(!r.ok) throw new Error('Банк HTTP '+r.status); return r.text(); }),
+    fetch(HR_PUB+'?gid='+CLIENTS_GID+'&single=true&output=csv').then(r=>{ if(!r.ok) throw new Error('Клиенты HTTP '+r.status); return r.text(); })
+  ]);
+  const brows=_csv(bt), crows=_csv(ct);
+  const mgrByInn={}, nameByInn={};
+  for(let i=1;i<crows.length;i++){
+    const inn=(crows[i][0]||'').trim(); if(!inn) continue;
+    nameByInn[inn]=(crows[i][1]||'').trim();
+    const mm=(crows[i][2]||'').trim();
+    if(mm){ const f=SALES_MGRS.find(x=>x.key!=='all'&&mm.indexOf(x.name.split(' ')[0])===0); if(f) mgrByInn[inn]=f.key; }
+  }
+  const payments=[];
+  for(let i=1;i<brows.length;i++){
+    const r=brows[i]; const dm=(r[0]||'').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(!dm) continue;
+    const amt=parseFloat(String(r[1]||'').replace(/\s/g,'').replace(',','.'))||0;
+    if(amt<=0) continue;
+    payments.push({y:+dm[1], m:+dm[2], amt, inn:(r[2]||'').trim(), name:(r[3]||'').trim()});
+  }
+  BANK_LIVE={payments, mgrByInn, nameByInn};
+}
+function _clientShort(s){
+  s=String(s||'').replace(/индивидуальный предприниматель/gi,'ИП').replace(/\s+/g,' ').trim();
+  return s.length>32?s.slice(0,31)+'…':s;
+}
+function renderClientRevenue(){
+  const wrap=document.getElementById('slClientsWrap'); if(!wrap) return;
+  const sub=document.getElementById('slClientsSub');
+  const txt=isDark?'#8b949e':'#57606a';
+  if(!BANK_LIVE){ wrap.innerHTML=`<div style="font-size:12px;color:${txt};padding:8px 0">Данные банка ещё не загрузились…</div>`; return; }
+  const [mName,yStr]=slSelMonth.split(' '); const year=+yStr, mm=_MNUM[mName]||1;
+  const byInn={};
+  BANK_LIVE.payments.forEach(p=>{
+    if(p.y!==year||p.m!==mm) return;
+    const mgr=BANK_LIVE.mgrByInn[p.inn]||null;
+    if(slMgr!=='all' && mgr!==slMgr) return;
+    const key=p.inn||p.name;
+    const o=(byInn[key]=byInn[key]||{sum:0,name:BANK_LIVE.nameByInn[p.inn]||p.name||p.inn});
+    o.sum+=p.amt;
+  });
+  const list=Object.values(byInn).sort((a,b)=>b.sum-a.sum);
+  const total=list.reduce((s,c)=>s+c.sum,0);
+  if(sub) sub.textContent=slSelMonth+' · '+(slMgr==='all'?'все менеджеры':mgrName(slMgr))+' · всего '+fmt(Math.round(total));
+  if(!list.length){
+    wrap.innerHTML=`<div style="font-size:12px;color:${txt};padding:8px 0">За ${slSelMonth} оплат не найдено${slMgr!=='all'?' у этого менеджера. Клиент появится, когда в листе «Клиенты» ему будет проставлен менеджер.':'.'}</div>`;
+    return;
+  }
+  const max=list[0].sum||1;
+  const pal=STAGE_PAL[7];
+  wrap.innerHTML=list.slice(0,25).map((c,i)=>{
+    const w=Math.max(2,Math.round(c.sum/max*100));
+    return `<div class="going-row" style="padding:4px 0">
+      <div class="going-lbl" style="width:200px" title="${_esc(c.name)}">${_esc(_clientShort(c.name))}</div>
+      <div class="going-bar" style="border:none;background:${isDark?'#161b22':'#eef1f4'}"><div class="going-fill" style="width:${w}%;background:${pal[i%pal.length]};border-radius:3px"></div></div>
+      <div class="going-num" style="width:86px"><b>${fmt(Math.round(c.sum))}</b></div>
+    </div>`;
+  }).join('') + (list.length>25?`<div style="font-size:11px;color:${txt};padding-top:4px">и ещё ${list.length-25} клиент(ов)…</div>`:'');
+}
 
 // ===== КОНВЕРСИИ ПО ДНЯМ (отдел продаж) =====
 const SALES_CV_PAIRS=[
@@ -3009,8 +3079,9 @@ function storeSet(k,v){
 // Загрузка живых данных; rerender=true — перерисовать текущий вид после обновления
 let _lastLiveOk = 0;
 async function loadLive(rerender){
-  const [fin, hr, sl, , hp] = await Promise.allSettled([fetchLiveData(), fetchHRLive(), fetchSalesLive(), loadStore(), fetchHRPlans()]);
+  const [fin, hr, sl, , hp, bk] = await Promise.allSettled([fetchLiveData(), fetchHRLive(), fetchSalesLive(), loadStore(), fetchHRPlans(), fetchBankLive()]);
   if(hp && hp.status==='rejected') console.warn('⚠️ Лист «Планы» не загрузился:', hp.reason&&hp.reason.message);
+  if(bk && bk.status==='rejected') console.warn('⚠️ Данные банка не загрузились:', bk.reason&&bk.reason.message);
   let ok=false;
   if(fin.status==='fulfilled' && fin.value.length>=3){
     months = fin.value;
